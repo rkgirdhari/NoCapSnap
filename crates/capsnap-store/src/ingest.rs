@@ -150,6 +150,11 @@ impl LocalStore {
         }
         let format = image_format(sniff_mime(&bytes).ok_or(IngestError::UnsupportedFormat)?);
         let table_label = normalize_table_label(details.table_label)?;
+        // A capture belongs to the dish's location, or else to the current one.
+        let current_location = self
+            .setting(crate::Setting::LocationId)
+            .await
+            .map_err(IngestError::Db)?;
         let dish = match details.menu_item_id {
             Some(id) => match self.menu_item(id).await.map_err(IngestError::Db)? {
                 Some(item) if item.is_active => Some(item),
@@ -183,7 +188,10 @@ impl LocalStore {
             media_bytes: Some(processed.jpeg.len() as i64),
             media_width: Some(i64::from(processed.width)),
             media_height: Some(i64::from(processed.height)),
-            location_id: dish.as_ref().map(|d| d.location_id.as_str()),
+            location_id: dish
+                .as_ref()
+                .map(|d| d.location_id.as_str())
+                .or(current_location.as_deref()),
             menu_item_id: dish.as_ref().map(|d| d.id.as_str()),
             dish_name: dish.as_ref().map(|d| d.name.as_str()),
             table_label: table_label.as_deref(),

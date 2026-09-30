@@ -75,6 +75,13 @@ pub enum Setting {
     StaffDisplayName,
     LocationId,
     LocationName,
+    // W3a: the signed-in server session.
+    ServerUrl,
+    SessionToken,
+    SessionExpiresAt,
+    StaffId,
+    StaffRole,
+    OrganizationName,
 }
 
 impl Setting {
@@ -83,6 +90,12 @@ impl Setting {
             Setting::StaffDisplayName => "staff_display_name",
             Setting::LocationId => "location_id",
             Setting::LocationName => "location_name",
+            Setting::ServerUrl => "server_url",
+            Setting::SessionToken => "session_token",
+            Setting::SessionExpiresAt => "session_expires_at",
+            Setting::StaffId => "staff_id",
+            Setting::StaffRole => "staff_role",
+            Setting::OrganizationName => "organization_name",
         }
     }
 }

@@ -45,6 +45,12 @@ pub struct Capture {
     pub dish_name: Option<String>,
     /// Device-only staff reference (owner default M6): never synced.
     pub table_label: Option<String>,
+    pub remote_media_id: Option<String>,
+    /// `<server>/g/#<token>` once the server has acknowledged the capture.
+    pub guest_url: Option<String>,
+    pub guest_expires_at: Option<String>,
+    pub sync_attempts: i64,
+    pub last_sync_error: Option<String>,
 }
 
 #[derive(Default)]
@@ -70,11 +76,20 @@ macro_rules! select_captures {
         concat!(
             "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
                     media_mime, media_bytes, media_width, media_height,
-                    location_id, menu_item_id, dish_name, table_label
+                    location_id, menu_item_id, dish_name, table_label,
+                    remote_media_id, guest_url, guest_expires_at, sync_attempts, last_sync_error
              FROM captures ",
             $tail
         )
     };
+}
+
+/// What the server said when it accepted a capture.
+pub struct Ack<'a> {
+    pub synced_at_utc: &'a str,
+    pub server_capture_id: &'a str,
+    pub guest_url: Option<&'a str>,
+    pub guest_expires_at: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -152,6 +167,66 @@ impl LocalStore {
         ))
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// Pending captures the server can take: those made at a real (not demo)
+    /// location. Oldest first.
+    pub async fn syncable_pending(&self) -> Result<Vec<Capture>, sqlx::Error> {
+        sqlx::query_as(select_captures!(
+            "WHERE sync_state = 'pending' AND location_id IS NOT NULL AND location_id <> ?
+             ORDER BY capture_time_utc, id"
+        ))
+        .bind(DEMO_LOCATION_ID)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn set_remote_media(
+        &self,
+        client_id: &str,
+        media_id: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE captures SET remote_media_id = ? WHERE client_id = ?")
+            .bind(media_id)
+            .bind(client_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The server's acknowledgement: the capture becomes "Synced · QR ready".
+    pub async fn record_ack(&self, client_id: &str, ack: &Ack<'_>) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE captures SET sync_state = 'synced', synced_at_utc = ?, server_capture_id = ?,
+                    guest_url = ?, guest_expires_at = ?, last_sync_error = NULL
+             WHERE client_id = ? AND sync_state = 'pending'",
+        )
+        .bind(ack.synced_at_utc)
+        .bind(ack.server_capture_id)
+        .bind(ack.guest_url)
+        .bind(ack.guest_expires_at)
+        .bind(client_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    pub async fn record_sync_error(
+        &self,
+        client_id: &str,
+        message: &str,
+        at_utc: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE captures SET sync_attempts = sync_attempts + 1, last_sync_error = ?, last_attempt_utc = ?
+             WHERE client_id = ?",
+        )
+        .bind(message.chars().take(200).collect::<String>())
+        .bind(at_utc)
+        .bind(client_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Newest first, for the History screen.

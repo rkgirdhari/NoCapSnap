@@ -131,7 +131,12 @@ async fn harden(State(_): State<AppState>, req: Request, next: Next) -> Response
 /// Runs the server until Ctrl-C / SIGTERM, with the retention job hourly.
 pub async fn serve(state: AppState) -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(state.cfg.bind).await?;
-    tracing::info!(addr = %state.cfg.bind, "listening");
+    serve_listener(listener, state).await
+}
+
+/// As [`serve`], on an already bound listener (tests bind port 0).
+pub async fn serve_listener(listener: tokio::net::TcpListener, state: AppState) -> std::io::Result<()> {
+    tracing::info!(addr = %listener.local_addr()?, "listening");
     let (pool, media) = (state.pool.clone(), state.cfg.media_dir.clone());
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
