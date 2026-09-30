@@ -20,7 +20,8 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 | W0 | Spec intake + SQLite-on-Android spike | Approved |
 | W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
 | W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
-| W3 | Hosted feedback slice (Axum/SQLite server, sync, guest portal) | Proposed; awaiting approval and D4 |
+| W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Built; awaiting owner review |
+| W3b | Deploy to the vServer (TLS, guest domain) | Waiting on D4, G1, G2 |
 
 ## Layout
 
@@ -36,8 +37,10 @@ nocapsnap/
 │   ├── src/         # UI — design language in src/app.css
 │   ├── src-tauri/   # Rust core + gen/android (Gradle project)
 │   └── scripts/build-android.sh
+├── server/          # Axum + SQLite server: staff API, media checks, guest portal (/g/)
 └── crates/
     ├── capsnap-store/   # SQLite outbox, menu cache, on-device photo pipeline
+    ├── capsnap-sync/    # phone side of sync: sign-in, outbox upload, guest links
     └── capsnap-onboard/ # ONB-1: consent-based import from a restaurant's own site (server-side)
 ```
 
@@ -52,7 +55,8 @@ pnpm check          # svelte-check, warnings fail
 ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug APK + Play checks
 ```
 
-Rust tests: `crates/capsnap-store/scripts/test-host.sh` and `crates/capsnap-onboard/scripts/test-host.sh`.
+Rust tests: `scripts/test-host.sh` in each of `crates/capsnap-store`, `crates/capsnap-sync`,
+`crates/capsnap-onboard` and `server`. The server README explains how to run it locally.
 A plain `pnpm build` (what Tauri bundles) leaves the browser preview out.
 
 The repo-root `.cargo/config.toml` belongs to HMS Forge and expects `sccache`

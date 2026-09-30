@@ -135,7 +135,10 @@ pub async fn serve(state: AppState) -> std::io::Result<()> {
 }
 
 /// As [`serve`], on an already bound listener (tests bind port 0).
-pub async fn serve_listener(listener: tokio::net::TcpListener, state: AppState) -> std::io::Result<()> {
+pub async fn serve_listener(
+    listener: tokio::net::TcpListener,
+    state: AppState,
+) -> std::io::Result<()> {
     tracing::info!(addr = %listener.local_addr()?, "listening");
     let (pool, media) = (state.pool.clone(), state.cfg.media_dir.clone());
     tokio::spawn(async move {

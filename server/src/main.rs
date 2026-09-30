@@ -21,7 +21,10 @@ environment: CAPSNAP_PUBLIC_BASE_URL (required), CAPSNAP_DATA_DIR (./data), CAPS
 async fn main() -> ExitCode {
     // Plain text when not on a terminal (journald), so logs carry no colour codes.
     let ansi = std::io::IsTerminal::is_terminal(&std::io::stdout());
-    tracing_subscriber::fmt().with_target(false).with_ansi(ansi).init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .with_ansi(ansi)
+        .init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     match run(&args).await {
         Ok(msg) => {

@@ -349,7 +349,12 @@ async fn the_default_policy_refuses_internal_addresses_before_connecting() {
     // every https request failed before DNS; this pins that down.
     let https = pinned(IpAddr::V4(Ipv4Addr::LOCALHOST));
     assert_eq!(
-        import("https://atelier8.test/", &consent("https://atelier8.test/"), &https).await,
+        import(
+            "https://atelier8.test/",
+            &consent("https://atelier8.test/"),
+            &https
+        )
+        .await,
         Err(ImportError::BlockedAddress("atelier8.test".into()))
     );
 }

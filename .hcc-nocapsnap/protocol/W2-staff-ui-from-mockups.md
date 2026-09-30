@@ -448,3 +448,9 @@ adb install capsnap-w2-arm64-release-debugsigned.apk
 - **D4 (hosting): still open.** Spec §7 makes it a hard gate for deploying W3.
 - Next: [`W3-PROPOSAL-hosted-feedback-slice.md`](W3-PROPOSAL-hosted-feedback-slice.md), which is a proposal only.
   Nothing starts without the owner's approval.
+
+## Erratum (found in W3a, 2026-09-30)
+
+- **ONB-1 was labelled Built but could not read https sites.** The crate had no TLS backend: reqwest was built
+  without default features, and none was added. W2's tests used only plain http, so they missed it. It was fixed
+  in W3a (`21867df`), with an https regression test. See the W3a report, finding 1.
