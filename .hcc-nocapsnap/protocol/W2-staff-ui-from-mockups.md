@@ -1,7 +1,7 @@
 # W2 — Staff UI from the owner's mockups (local vertical slice)
 
-Date: 2026-09-30 · Status: **Built; awaiting owner review of the W2 gate.** Nothing in W2 has run on an Android
-device. D7 was waived in W1; see decision D9 below.
+Date: 2026-09-30 · Status: **Approved by the owner (2026-09-30).** Nothing in W2 has run on an Android device.
+D7 was waived in W1, and D9 (below) is still open. See "Closure".
 
 **Input.** Five high-fidelity mockups from the owner, titled "NO CAP SNAP":
 1. Home
@@ -17,7 +17,7 @@ They are now committed in [`../design/mockups/`](../design/mockups/) with SHA-25
 
 ```
 ## Gate W2 — Local vertical slice
-Status: Built — awaiting owner review. Browser, host and APK evidence only; no device run.
+Status: Approved 2026-09-30 (built; browser, host and APK evidence only; no device run)
 Evidence: 25 store tests + 17 import tests; svelte-check 0/0; clippy -D warnings (Android arm64, debug and release);
           release APK Play checks; mockup-vs-build images; QR non-scannable (2 decoders); see "Evidence"
 Changes: crates/capsnap-store (promoted + photo pipeline + menu), crates/capsnap-onboard (new, ONB-1),
@@ -435,3 +435,16 @@ adb install capsnap-w2-arm64-release-debugsigned.apk
   before re-encoding?
 - **D4 — Hosting** (still open from W0, and needed for W3). The ZAP product name, plus the output of
   `uname -a; systemctl --version | head -1; nproc; free -h; df -h /`. Please don't send passwords or keys.
+
+## Closure (2026-09-30)
+
+- **W2 approved.** The owner replied *"Approved"* to this report. The evidence and labels stand as written: every
+  device item stays **Specified**.
+- **D9 (device check before W3): not answered, so still open.** The approval is not read as a waiver. The
+  checklist above still applies. The W3 proposal asks again, because W3's sync client depends on the Android IPC
+  path fixed here (finding 1).
+- **M4 (display serif): default kept.** The device serif stays; no font is bundled.
+- **M7 (photo colour): default kept.** Output stays untagged (no ICC).
+- **D4 (hosting): still open.** Spec §7 makes it a hard gate for deploying W3.
+- Next: [`W3-PROPOSAL-hosted-feedback-slice.md`](W3-PROPOSAL-hosted-feedback-slice.md), which is a proposal only.
+  Nothing starts without the owner's approval.

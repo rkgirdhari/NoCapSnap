@@ -19,7 +19,8 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 |---|---|---|
 | W0 | Spec intake + SQLite-on-Android spike | Approved |
 | W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
-| W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Built; awaiting owner review (device check D9 open) |
+| W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
+| W3 | Hosted feedback slice (Axum/SQLite server, sync, guest portal) | Proposed; awaiting approval and D4 |
 
 ## Layout
 
