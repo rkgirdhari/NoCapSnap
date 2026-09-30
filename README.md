@@ -33,8 +33,9 @@ cd nocapsnap
 corepack enable
 pnpm install
 
-# API on :3000
-pnpm dev:api
+# API on :3000. API_URL is the base for locally stored file URLs (QR image,
+# photos), so use an address the phone can reach — 10.0.2.2 for the emulator.
+API_URL=http://10.0.2.2:3000 pnpm dev:api
 curl localhost:3000/health
 
 # Mobile — point the app at your API first
@@ -113,8 +114,13 @@ one, e.g. `apt-get install -y fonts-dejavu-core` on Debian-based images.
 
 ## Mobile app flow
 
-`index` → `login` (stub) → `capture` (expo-camera) → `preview` → `send`
-(POSTs to the API) · `history` (stub).
+`index` → `login` (stub) → `capture` (expo-camera) → `preview` → `send` ·
+`history` (stub).
+
+`send` uploads the photo, then shows the guest QR (`qrCodeUrl`) on a white card
+with the verification code and table, the review link, **Share review link**
+(system share sheet — SMS, WhatsApp, etc.) and **Snap next plate** (back to the
+camera). If the QR image can't load, it says so and the link/share still work.
 
 The captured photo is held in memory (`src/state/pendingCapture.ts`) between
 screens instead of being passed through route params — the base64 image is
@@ -164,6 +170,5 @@ regenerates them from `app.json` on every build, so change native config there.
 
 - Postgres-backed `PhotoRepository`, plus menu/location lookups so the stamp
   shows dish, restaurant and local time.
-- Show the returned QR (`qrCodeUrl`) and `reviewUrl` on the mobile `send` screen.
 - Real staff auth to replace `loginStub` (JWT stored in `expo-secure-store`).
 - Dish selector on the capture screen; photo log on `history`.

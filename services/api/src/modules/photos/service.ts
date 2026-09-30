@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import type { CapturePhotoRequest, Photo, UUID } from "@nocapsnap/shared";
+import { photoVerificationCode, type CapturePhotoRequest, type Photo, type UUID } from "@nocapsnap/shared";
 import { HttpError } from "../../lib/errors";
 import type { ObjectStorage } from "../../lib/storage";
 import { InvalidImageError, processCapture } from "./images";
@@ -50,7 +50,7 @@ export class PhotoService {
     try {
       processed = await processCapture(image, {
         capturedAt,
-        verificationCode: id.slice(0, 8).toUpperCase(),
+        verificationCode: photoVerificationCode(id),
         tableNumber: payload.tableNumber || undefined,
       });
     } catch (err) {
