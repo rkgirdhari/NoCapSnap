@@ -5,9 +5,10 @@ use sqlx::sqlite::{
     SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
 };
 
-pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
-
 /// WAL with full fsync and foreign keys on; migrations applied.
+///
+/// Migrations a newer release applied are tolerated, so a release can be rolled back to
+/// the previous binary (W3b). That only holds while migrations stay additive.
 pub async fn open(path: &Path) -> Result<SqlitePool, sqlx::Error> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(sqlx::Error::Io)?;
@@ -23,6 +24,9 @@ pub async fn open(path: &Path) -> Result<SqlitePool, sqlx::Error> {
         .max_connections(8)
         .connect_with(options)
         .await?;
-    MIGRATOR.run(&pool).await?;
+    sqlx::migrate!("./migrations")
+        .set_ignore_missing(true)
+        .run(&pool)
+        .await?;
     Ok(pool)
 }

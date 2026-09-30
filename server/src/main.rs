@@ -7,6 +7,7 @@ use capsnap_server::{AppState, Config, admin, retention};
 
 const USAGE: &str = "usage:
   capsnap-server serve
+  capsnap-server version
   capsnap-server create-org <slug> <name>
   capsnap-server create-location <org-slug> <name> <iana-timezone>
   capsnap-server create-staff <org-slug> <login> <display-name> <admin|manager|chef|server> [location-id ...]
@@ -41,6 +42,9 @@ async fn main() -> ExitCode {
 }
 
 async fn run(args: &[String]) -> Result<String, String> {
+    if matches!(args, [a] if a == "version") {
+        return Ok(format!("capsnap-server {}", env!("CARGO_PKG_VERSION")));
+    }
     let cfg = Config::from_env()?;
     let state = AppState::open(cfg)
         .await

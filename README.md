@@ -21,7 +21,7 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 | W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
 | W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
 | W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Approved (device check D9 still open) |
-| W3b | Deploy to the vServer (TLS, guest domain) | Waiting on D4, G1, G2 |
+| W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Open; deploy kit in progress. G1 (domain) still needed |
 
 ## Layout
 
@@ -38,6 +38,7 @@ nocapsnap/
 │   ├── src-tauri/   # Rust core + gen/android (Gradle project)
 │   └── scripts/build-android.sh
 ├── server/          # Axum + SQLite server: staff API, media checks, guest portal (/g/)
+├── deploy/          # W3b: preflight, install, smoke test, release switching for the ZAP VPS
 └── crates/
     ├── capsnap-store/   # SQLite outbox, menu cache, on-device photo pipeline
     ├── capsnap-sync/    # phone side of sync: sign-in, outbox upload, guest links
@@ -57,6 +58,8 @@ ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug A
 
 Rust tests: `scripts/test-host.sh` in each of `crates/capsnap-store`, `crates/capsnap-sync`,
 `crates/capsnap-onboard` and `server`. The server README explains how to run it locally.
+CI (`.github/workflows/capsnap-server.yml`) tests the server, builds a static x86_64 binary
+and rehearses the deploy kit on a real systemd + nginx runner; `deploy/README.md` is the runbook.
 A plain `pnpm build` (what Tauri bundles) leaves the browser preview out.
 
 The repo-root `.cargo/config.toml` belongs to HMS Forge and expects `sccache`

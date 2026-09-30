@@ -4,8 +4,8 @@ The CapSnap server (Spec §2, §5): the staff API, media validation and the gues
 portal. It runs as one Rust binary on Axum with SQLite, is self-hosted, and uses no cloud
 services.
 
-Status: **W3a, built and host-tested only.** Deployment (W3b) waits on the hosting check
-(D4), the guest-link domain (G1) and HTTPS (G2).
+Status: **W3a approved; W3b open.** The deploy kit is in `../deploy/` (nginx in front, systemd,
+static musl binary). Going live waits on the guest-link domain (G1).
 
 ## Run locally
 
