@@ -1,14 +1,14 @@
+# Build output
 node_modules
-dist
-.expo
-.turbo
-.data
+target
+build
+.svelte-kit
+.DS_Store
+
+# Secrets — never commit
 .env
-.env.local
+.env.*
 *.jks
 *.keystore
-google-services.json
+keystore.properties
 google-play-service-account.json
-android/app/build
-coverage
-.DS_Store
