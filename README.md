@@ -18,7 +18,8 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 | Gate | Scope | Status |
 |---|---|---|
 | W0 | Spec intake + SQLite-on-Android spike | Approved |
-| W1 | Tauri 2 Android shell + camera spike, staff UI design | Built; awaiting owner device checklist (D7) |
+| W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
+| W2 | Staff UI from the owner's NO CAP SNAP mockups | In progress |
 
 ## Layout
 
@@ -26,13 +27,15 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 nocapsnap/
 ├── .hcc-nocapsnap/
 │   ├── spec/        # owner spec (verbatim)
-│   └── protocol/    # gate reports W0, W1, …
+│   ├── protocol/    # gate reports W0, W1, …
+│   ├── design/      # owner mockups + measured palette
+│   └── backlog/     # specified, not yet built
 ├── app/             # staff app: SvelteKit static SPA + Tauri 2 (Android)
 │   ├── src/         # UI — design language in src/app.css
 │   ├── src-tauri/   # Rust core + gen/android (Gradle project)
 │   └── scripts/build-android.sh
-└── spikes/
-    └── w0-sqlite-android/   # local-first SQLite outbox + capture ingest
+└── crates/
+    └── capsnap-store/   # SQLite outbox, menu cache, on-device photo pipeline
 ```
 
 ## Staff app (`app/`)
@@ -45,7 +48,7 @@ pnpm check          # svelte-check, warnings fail
 ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug APK + Play checks
 ```
 
-Rust tests for the store: `spikes/w0-sqlite-android/scripts/test-host.sh`.
+Rust tests for the store: `crates/capsnap-store/scripts/test-host.sh`.
 
 The repo-root `.cargo/config.toml` belongs to HMS Forge and expects `sccache`
 and `mold`; the CapSnap scripts switch those off (`RUSTC_WRAPPER=`).

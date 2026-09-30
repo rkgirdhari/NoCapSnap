@@ -29,7 +29,7 @@ for target in "${TARGETS[@]}"; do
   cargo build --locked --release --target "$target"
 
   out="target/api${API}/${target}/release"
-  so="$out/libcapsnap_store_spike.so"
+  so="$out/libcapsnap_store.so"
   echo "== ${target} API ${API}"
   file "$so" "$out/selftest" | sed "s|$PWD/||"
   echo "size: $(stat -c %s "$so") bytes"

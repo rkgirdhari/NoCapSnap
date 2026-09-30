@@ -9,7 +9,7 @@ async fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir().join("capsnap-w0-selftest.db"));
     let _ = std::fs::remove_file(&path);
-    match capsnap_store_spike::selftest(&path).await {
+    match capsnap_store::selftest(&path).await {
         Ok(summary) => println!("W0 selftest {summary} path={}", path.display()),
         Err(err) => {
             eprintln!("W0 selftest FAILED: {err}");

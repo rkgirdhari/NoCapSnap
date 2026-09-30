@@ -1,14 +1,22 @@
-//! W0 feasibility spike (Specified → Built only for what the tests and the
-//! Android cross-compile below actually prove).
+//! CapSnap's on-device store (promoted from the W0 spike in W2).
 //!
-//! A minimal local-first outbox: captures are committed to SQLite as
-//! `pending`, and flip to `synced` only after the server acknowledges them.
-//! W1 adds [`LocalStore::ingest`], which stores the photo bytes next to the
-//! database and queues the capture in one call.
+//! A local-first outbox: captures are committed to SQLite as `pending`, and
+//! flip to `synced` only after the server acknowledges them.
+//! [`LocalStore::ingest`] processes the photo on the device (orientation,
+//! 2048 px, metadata stripped), stores it next to the database and queues the
+//! capture in one call. W2 adds the menu cache and device-only settings.
 
 mod ingest;
+mod menu;
+pub mod photo;
 
-pub use ingest::{IngestError, MAX_MEDIA_BYTES, media_path, sniff_mime};
+pub use ingest::{
+    CaptureDetails, IngestError, MAX_MEDIA_BYTES, MAX_TABLE_LABEL_CHARS, media_path, sniff_mime,
+    thumb_path,
+};
+pub use menu::{DEMO_LOCATION_ID, DEMO_LOCATION_NAME, MenuItem, MenuSource, NewMenuItem, Setting};
+/// The store's database error, so callers need no direct sqlx dependency.
+pub use sqlx::Error as DbError;
 
 use std::ffi::{CStr, c_char};
 use std::path::Path;
@@ -30,8 +38,16 @@ pub struct Capture {
     pub synced_at_utc: Option<String>,
     pub media_mime: Option<String>,
     pub media_bytes: Option<i64>,
+    pub media_width: Option<i64>,
+    pub media_height: Option<i64>,
+    pub location_id: Option<String>,
+    pub menu_item_id: Option<String>,
+    pub dish_name: Option<String>,
+    /// Device-only staff reference (owner default M6): never synced.
+    pub table_label: Option<String>,
 }
 
+#[derive(Default)]
 pub struct NewCapture<'a> {
     pub client_id: &'a str,
     pub staff_id: &'a str,
@@ -39,6 +55,26 @@ pub struct NewCapture<'a> {
     pub capture_time_utc: &'a str,
     pub media_mime: Option<&'a str>,
     pub media_bytes: Option<i64>,
+    pub media_width: Option<i64>,
+    pub media_height: Option<i64>,
+    pub location_id: Option<&'a str>,
+    pub menu_item_id: Option<&'a str>,
+    pub dish_name: Option<&'a str>,
+    pub table_label: Option<&'a str>,
+}
+
+/// `SELECT <every Capture column> FROM captures <tail>`, as a `&'static str`
+/// (sqlx 0.9 only accepts static query text).
+macro_rules! select_captures {
+    ($tail:literal) => {
+        concat!(
+            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
+                    media_mime, media_bytes, media_width, media_height,
+                    location_id, menu_item_id, dish_name, table_label
+             FROM captures ",
+            $tail
+        )
+    };
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -78,8 +114,9 @@ impl LocalStore {
     pub async fn enqueue(&self, new: &NewCapture<'_>) -> Result<Capture, sqlx::Error> {
         sqlx::query(
             "INSERT INTO captures
-                 (client_id, staff_id, media_sha256, capture_time_utc, media_mime, media_bytes)
-             VALUES (?, ?, ?, ?, ?, ?)
+                 (client_id, staff_id, media_sha256, capture_time_utc, media_mime, media_bytes,
+                  media_width, media_height, location_id, menu_item_id, dish_name, table_label)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT (client_id) DO NOTHING",
         )
         .bind(new.client_id)
@@ -88,6 +125,12 @@ impl LocalStore {
         .bind(new.capture_time_utc)
         .bind(new.media_mime)
         .bind(new.media_bytes)
+        .bind(new.media_width)
+        .bind(new.media_height)
+        .bind(new.location_id)
+        .bind(new.menu_item_id)
+        .bind(new.dish_name)
+        .bind(new.table_label)
         .execute(&self.pool)
         .await?;
         self.get(new.client_id)
@@ -96,34 +139,26 @@ impl LocalStore {
     }
 
     pub async fn get(&self, client_id: &str) -> Result<Option<Capture>, sqlx::Error> {
-        sqlx::query_as(
-            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
-                    media_mime, media_bytes
-             FROM captures WHERE client_id = ?",
-        )
-        .bind(client_id)
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as(select_captures!("WHERE client_id = ?"))
+            .bind(client_id)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Captures still waiting for a server acknowledgement ("saved offline / QR not ready").
     pub async fn pending(&self) -> Result<Vec<Capture>, sqlx::Error> {
-        sqlx::query_as(
-            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
-                    media_mime, media_bytes
-             FROM captures WHERE sync_state = 'pending' ORDER BY capture_time_utc, id",
-        )
+        sqlx::query_as(select_captures!(
+            "WHERE sync_state = 'pending' ORDER BY capture_time_utc, id"
+        ))
         .fetch_all(&self.pool)
         .await
     }
 
     /// Newest first, for the History screen.
     pub async fn list_recent(&self, limit: i64) -> Result<Vec<Capture>, sqlx::Error> {
-        sqlx::query_as(
-            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
-                    media_mime, media_bytes
-             FROM captures ORDER BY capture_time_utc DESC, id DESC LIMIT ?",
-        )
+        sqlx::query_as(select_captures!(
+            "ORDER BY capture_time_utc DESC, id DESC LIMIT ?"
+        ))
         .bind(limit)
         .fetch_all(&self.pool)
         .await
@@ -197,8 +232,7 @@ pub async fn selftest(path: &Path) -> Result<String, String> {
         staff_id: "staff-1",
         media_sha256: &digest,
         capture_time_utc: "2026-09-30T12:00:00Z",
-        media_mime: None,
-        media_bytes: None,
+        ..NewCapture::default()
     };
     let store = LocalStore::open(path)
         .await

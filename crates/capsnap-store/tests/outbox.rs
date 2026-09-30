@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use capsnap_store_spike::{LocalStore, NewCapture, Pragma, capsnap_spike_selftest, selftest};
+use capsnap_store::{LocalStore, NewCapture, Pragma, capsnap_spike_selftest, selftest};
 
 fn digest(c: char) -> String {
     c.to_string().repeat(64)
@@ -12,8 +12,7 @@ fn capture<'a>(client_id: &'a str, sha: &'a str, at: &'a str) -> NewCapture<'a> 
         staff_id: "staff-1",
         media_sha256: sha,
         capture_time_utc: at,
-        media_mime: None,
-        media_bytes: None,
+        ..NewCapture::default()
     }
 }
 
