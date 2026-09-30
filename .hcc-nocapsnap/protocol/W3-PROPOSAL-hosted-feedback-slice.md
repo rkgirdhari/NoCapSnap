@@ -1,6 +1,7 @@
 # W3 — Hosted feedback slice (PROPOSAL)
 
-Date: 2026-09-30 · Status: **W3a approved and opened by the owner** (*"Approved, open W3a"*, 2026-09-30).
+Date: 2026-09-30 · Status: **W3a opened** (*"Approved, open W3a"*) **and approved as built** (*"approved"*), both
+2026-09-30; see [`W3a-hosted-feedback-slice-build.md`](W3a-hosted-feedback-slice-build.md).
 W3b is still waiting on D4, G1 and G2. D9 and R1 are unanswered; R1's recommendation (test data only) applies.
 
 Spec §7 Phase 3: *"Deploy the Axum/SQLite backend to a verified vServer and implement the fragment-based guest

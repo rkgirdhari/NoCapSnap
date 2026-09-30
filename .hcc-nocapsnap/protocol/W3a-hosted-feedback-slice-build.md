@@ -1,6 +1,7 @@
 # W3a — Hosted feedback slice, built and host-tested
 
-Date: 2026-09-30 · Status: **Built; awaiting owner review.** The owner opened W3a with *"Approved, open W3a"*.
+Date: 2026-09-30 · Status: **Approved by the owner (2026-09-30).** The owner opened W3a with *"Approved, open W3a"*.
+See "Closure".
 Proposal: [`W3-PROPOSAL-hosted-feedback-slice.md`](W3-PROPOSAL-hosted-feedback-slice.md).
 
 Nothing was deployed; that is W3b. Nothing has run on an Android device (D9 is still open).
@@ -307,3 +308,15 @@ own `adb reverse`. The real test of step 3 is W3b, with a domain and https.
 - **R1:** test data only until the W4 restore drill passes. Recommended; no answer yet.
 - **P1 (new):** keep the guest page as a small static page (recommended: 7.5 KB in all, no build step), or rebuild it
   in SvelteKit to match Spec §2's wording?
+
+## Closure (2026-09-30)
+
+- **W3a approved.** The owner replied *"approved"* to this report. The evidence and labels stand as written: every
+  device item stays **Specified**, and so does everything in W3b.
+- **P1 (guest page): default kept.** The guest portal stays a small static page served by the server. This is a
+  recorded deviation from Spec §2's SvelteKit wording.
+- **R1 (real guest data): default kept.** Test data only until the W4 restore drill passes.
+- **D9 (device check): not answered, so still open.** The approval is not read as a waiver. It is still
+  recommended before W3b.
+- **D4, G1, G2: still open.** W3b cannot start without them. D4 is Spec §7's hard gate.
+- Next: W3b (deploy), once D4, G1 and G2 are answered. Nothing starts without the owner's approval.
