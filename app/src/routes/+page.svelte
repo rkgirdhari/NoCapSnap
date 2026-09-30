@@ -18,12 +18,19 @@
   const serviceWord = now.getHours() >= 16 || now.getHours() < 5 ? "Tonight's service" : "Today's service";
   const firstName = $derived(profile?.displayName?.split(/\s+/)[0] ?? null);
 
-  onMount(async () => {
+  async function load() {
     try {
       [profile, status, captures] = await Promise.all([bridge.profile(), bridge.status(), bridge.list(200)]);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     }
+  }
+
+  onMount(() => {
+    load();
+    let off: (() => void) | undefined;
+    bridge.onSyncUpdated(load).then((u) => (off = u));
+    return () => off?.();
   });
 </script>
 

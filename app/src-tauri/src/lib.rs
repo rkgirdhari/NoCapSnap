@@ -1,9 +1,10 @@
-//! CapSnap staff app — Tauri shell (W2: staff UI from the owner's mockups).
+//! CapSnap staff app — Tauri shell (W2 staff UI; W3a sign-in and sync).
 //!
 //! The UI talks to the local-first store through the commands below. Photos
-//! cross the IPC boundary as raw bytes in both directions (no base64), are
-//! processed on the device in Rust (orientation, 2048 px, metadata stripped)
-//! and land in the app's private data directory.
+//! are processed on the device in Rust (orientation, 2048 px, metadata
+//! stripped) and land in the app's private data directory. All server traffic
+//! happens here in Rust (`capsnap-sync`); the WebView never talks to the
+//! server, so its CSP stays closed to the network.
 
 use std::path::PathBuf;
 
@@ -13,16 +14,21 @@ use capsnap_store::{
 };
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
-/// No sign-in until W3; real staff identities come from the server session (Spec §5).
+/// Staff id recorded on captures made while signed out (demo). Signed-in
+/// captures record the server's staff id; the server itself only trusts the session.
 const LOCAL_STAFF_ID: &str = "local-device";
 const MAX_DISPLAY_NAME_CHARS: usize = 40;
+/// How often the phone retries the outbox while the app is open.
+const SYNC_EVERY: std::time::Duration = std::time::Duration::from_secs(60);
 
 struct AppState {
     store: LocalStore,
     data_dir: PathBuf,
     media_dir: PathBuf,
+    /// One sync run at a time (button, timer and post-capture trigger share it).
+    sync_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Serialize)]
@@ -41,6 +47,11 @@ struct CaptureDto {
     menu_item_id: Option<String>,
     dish_name: Option<String>,
     table_label: Option<String>,
+    /// Made at the demo location: stays on this phone, never synced.
+    is_demo: bool,
+    guest_url: Option<String>,
+    guest_expires_at: Option<String>,
+    last_sync_error: Option<String>,
 }
 
 impl From<Capture> for CaptureDto {
@@ -55,10 +66,17 @@ impl From<Capture> for CaptureDto {
             captured_at: c.capture_time_utc,
             sync_state: c.sync_state,
             synced_at: c.synced_at_utc,
+            is_demo: c
+                .location_id
+                .as_deref()
+                .is_none_or(|l| l == capsnap_store::DEMO_LOCATION_ID),
             location_id: c.location_id,
             menu_item_id: c.menu_item_id,
             dish_name: c.dish_name,
             table_label: c.table_label,
+            guest_url: c.guest_url,
+            guest_expires_at: c.guest_expires_at,
+            last_sync_error: c.last_sync_error,
         }
     }
 }
@@ -98,8 +116,19 @@ struct ProfileDto {
     display_name: Option<String>,
     location_id: Option<String>,
     location_name: Option<String>,
-    /// True while the profile and menu are the local demo seed (no server yet).
+    /// True while the profile and menu are the local demo seed (signed out).
     is_demo: bool,
+    signed_in: bool,
+    server_url: Option<String>,
+    organization_name: Option<String>,
+    role: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionDto {
+    profile: ProfileDto,
+    locations: Vec<capsnap_sync::RemoteLocation>,
 }
 
 #[derive(Serialize)]
@@ -151,6 +180,17 @@ async fn profile_get(state: State<'_, AppState>) -> CmdResult<ProfileDto> {
         location_name: store.setting(Setting::LocationName).await.map_err(text)?,
         is_demo: location_id.as_deref() == Some(capsnap_store::DEMO_LOCATION_ID),
         location_id,
+        signed_in: store
+            .setting(Setting::SessionToken)
+            .await
+            .map_err(text)?
+            .is_some(),
+        server_url: store.setting(Setting::ServerUrl).await.map_err(text)?,
+        organization_name: store
+            .setting(Setting::OrganizationName)
+            .await
+            .map_err(text)?,
+        role: store.setting(Setting::StaffRole).await.map_err(text)?,
     })
 }
 
@@ -236,7 +276,11 @@ fn photo_bytes(body: &InvokeBody) -> CmdResult<Vec<u8>> {
 }
 
 #[tauri::command]
-async fn capture_ingest(request: Request<'_>, state: State<'_, AppState>) -> CmdResult<CaptureDto> {
+async fn capture_ingest(
+    request: Request<'_>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<CaptureDto> {
     let bytes = photo_bytes(request.body())?;
     let menu_item_id = header(&request, "x-capsnap-menu-item")?;
     let table_label = header(&request, "x-capsnap-table-label")?;
@@ -244,12 +288,100 @@ async fn capture_ingest(request: Request<'_>, state: State<'_, AppState>) -> Cmd
         menu_item_id: menu_item_id.as_deref(),
         table_label: table_label.as_deref(),
     };
-    state
+    let staff_id = state
         .store
-        .ingest(&state.media_dir, LOCAL_STAFF_ID, details, bytes)
+        .setting(Setting::StaffId)
         .await
-        .map(Into::into)
-        .map_err(text)
+        .map_err(text)?
+        .unwrap_or_else(|| LOCAL_STAFF_ID.to_owned());
+    let capture = state
+        .store
+        .ingest(&state.media_dir, &staff_id, details, bytes)
+        .await
+        .map_err(text)?;
+    // Try to sync straight away; the capture is already safe on the phone.
+    spawn_sync(app);
+    Ok(capture.into())
+}
+
+// ---------- Sign-in and sync (W3a) ----------
+
+#[tauri::command]
+async fn session_sign_in(
+    server_url: String,
+    login: String,
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<SessionDto> {
+    let signed = capsnap_sync::sign_in(
+        &state.store,
+        &server_url,
+        &login,
+        &password,
+        "CapSnap on Android",
+    )
+    .await
+    .map_err(text)?;
+    spawn_sync(app);
+    Ok(SessionDto {
+        profile: profile_get(state).await?,
+        locations: signed.me.locations,
+    })
+}
+
+#[tauri::command]
+async fn session_sign_out(state: State<'_, AppState>) -> CmdResult<ProfileDto> {
+    capsnap_sync::sign_out(&state.store).await.map_err(text)?;
+    profile_get(state).await
+}
+
+/// Refreshes who this phone belongs to and the menu; lists allowed locations.
+#[tauri::command]
+async fn session_refresh(state: State<'_, AppState>) -> CmdResult<SessionDto> {
+    let locations = capsnap_sync::refresh(&state.store).await.map_err(text)?;
+    Ok(SessionDto {
+        profile: profile_get(state).await?,
+        locations,
+    })
+}
+
+#[tauri::command]
+async fn session_choose_location(
+    location_id: String,
+    state: State<'_, AppState>,
+) -> CmdResult<ProfileDto> {
+    let locations = capsnap_sync::refresh(&state.store).await.map_err(text)?;
+    let location = locations
+        .iter()
+        .find(|l| l.id == location_id)
+        .ok_or("that location isn't available to you")?;
+    capsnap_sync::choose_location(&state.store, location)
+        .await
+        .map_err(text)?;
+    profile_get(state).await
+}
+
+#[tauri::command]
+async fn sync_now(app: AppHandle) -> CmdResult<capsnap_sync::SyncReport> {
+    run_sync(&app).await.map_err(text)
+}
+
+async fn run_sync(app: &AppHandle) -> Result<capsnap_sync::SyncReport, capsnap_sync::SyncError> {
+    let state = app.state::<AppState>();
+    let _one_at_a_time = state.sync_lock.lock().await;
+    let report = capsnap_sync::sync_pending(&state.store, &state.media_dir).await;
+    // Screens refresh on this event after every real run (not while signed out).
+    if report.is_ok() {
+        let _ = app.emit("sync-updated", ());
+    }
+    report
+}
+
+fn spawn_sync(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let _ = run_sync(&app).await;
+    });
 }
 
 #[tauri::command]
@@ -346,6 +478,11 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_get,
         profile_set_name,
         menu_list,
+        session_sign_in,
+        session_sign_out,
+        session_refresh,
+        session_choose_location,
+        sync_now,
         capture_ingest,
         list_captures,
         capture_get,
@@ -363,6 +500,11 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_get,
         profile_set_name,
         menu_list,
+        session_sign_in,
+        session_sign_out,
+        session_refresh,
+        session_choose_location,
+        sync_now,
         capture_ingest,
         list_captures,
         capture_get,
@@ -387,6 +529,15 @@ pub fn run() {
                 store,
                 media_dir: data_dir.join("media"),
                 data_dir,
+                sync_lock: tokio::sync::Mutex::new(()),
+            });
+            // While the app is open: sync now and then every minute (a no-op when signed out).
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let _ = run_sync(&handle).await;
+                    tokio::time::sleep(SYNC_EVERY).await;
+                }
             });
             Ok(())
         })

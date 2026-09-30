@@ -1,26 +1,55 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { bridge, type CaptureRecord } from "$lib/bridge";
+  import { bridge, type CaptureRecord, type Profile } from "$lib/bridge";
   import Icon from "$lib/components/Icon.svelte";
   import PlateRow from "$lib/components/PlateRow.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
   import { dayLabel, whenLabel } from "$lib/format";
 
   let captures = $state<CaptureRecord[]>([]);
+  let profile = $state<Profile | null>(null);
   let loaded = $state(false);
   let error = $state<string | null>(null);
+  let syncing = $state(false);
+  let syncNote = $state<string | null>(null);
 
-  onMount(async () => {
+  async function load() {
     try {
-      captures = await bridge.list(500);
+      [captures, profile] = await Promise.all([bridge.list(500), bridge.profile()]);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       loaded = true;
     }
+  }
+
+  onMount(() => {
+    load();
+    let off: (() => void) | undefined;
+    bridge.onSyncUpdated(load).then((u) => (off = u));
+    return () => off?.();
   });
 
-  const pending = $derived(captures.filter((c) => c.syncState === "pending").length);
+  async function retry() {
+    syncing = true;
+    syncNote = null;
+    try {
+      const r = await bridge.syncNow();
+      syncNote = r.stopped
+        ? `Not synced: ${r.stopped}.`
+        : r.refused
+          ? `${r.synced} synced; ${r.refused} refused by the server (see the plate).`
+          : `${r.synced} synced.`;
+    } catch (e) {
+      syncNote = e instanceof Error ? e.message : String(e);
+    } finally {
+      syncing = false;
+      await load();
+    }
+  }
+
+  // Demo plates never sync, so they don't count as waiting.
+  const pending = $derived(captures.filter((c) => c.syncState === "pending" && !c.isDemo).length);
   // The newest server acknowledgement on this device, if any ever happened.
   const lastSynced = $derived(
     captures.reduce<string | null>((max, c) => (c.syncedAt && (!max || c.syncedAt > max) ? c.syncedAt : max), null),
@@ -76,11 +105,19 @@
   {/each}
 
   {#if pending > 0}
-    <button class="btn gold block tall retry" disabled aria-describedby="retry-why">
-      <Icon name="sync" size={26} stroke={1.6} /> Retry when connected
-    </button>
-    <p id="retry-why" class="helper center">Sync isn't switched on in this build yet.</p>
+    {#if profile?.signedIn}
+      <button class="btn gold block tall retry" onclick={retry} disabled={syncing}>
+        <Icon name="sync" size={26} stroke={1.6} />
+        {syncing ? "Syncing…" : "Retry when connected"}
+      </button>
+      {#if !syncNote}<p class="helper center">It also retries by itself every minute while the app is open.</p>{/if}
+    {:else}
+      <a class="btn gold block tall retry" href="/settings"><Icon name="sync" size={26} stroke={1.6} /> Sign in to sync</a>
+      <p class="helper center">Plates wait safely on this phone until you sign in.</p>
+    {/if}
   {/if}
+  <!-- Outside the block above: after a full sync nothing is waiting, but the result still shows. -->
+  {#if syncNote}<p class="helper center" role="status">{syncNote}</p>{/if}
 </main>
 
 <style>

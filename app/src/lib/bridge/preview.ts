@@ -1,9 +1,11 @@
-import type { Bridge, CaptureRecord, MenuItem, Profile } from "./types";
+import type { Bridge, CaptureRecord, MenuItem, Profile, RemoteLocation } from "./types";
 
 // Browser preview for design review (built only in dev or with
 // VITE_CAPSNAP_PREVIEW=1). Mirrors the device contract in memory; nothing is
 // persisted, there is no SQLite, and photos are resized with a canvas instead
-// of the Rust pipeline.
+// of the Rust pipeline. Sign-in and sync are simulated (any credentials; the
+// "server" issues links on guests.preview.invalid) so the signed-in screens and
+// the real guest QR can be reviewed and decode-tested in a browser.
 
 // Everything lives inside the factory so that a build without the preview
 // flag drops this module entirely (top-level work would pin it in the bundle).
@@ -20,12 +22,27 @@ export function createPreviewBridge(): Bridge {
     ["demo-sweet-corn-miso", "Sweet corn & white miso soup", "Starters"],
     ["demo-tuna-crudo", "Tuna crudo, yuzu kosho", "Starters"],
   ].map(([id, name, category]) => ({ id, name, category, source: "demo" }));
+  const serverLocation: RemoteLocation = { id: "preview-atelier", name: "Atelier No. 8", timezone: "America/Chicago" };
+  const serverMenu: MenuItem[] = menu.map((m) => ({ ...m, id: m.id.replace("demo-", "srv-"), source: "server" }));
 
-  const profile: Profile = {
-    displayName: null,
+  let displayName: string | null = null;
+  const signedOut = (): Profile => ({
+    displayName,
     locationId: LOCATION_ID,
     locationName: "Atelier No. 8",
     isDemo: true,
+    signedIn: false,
+    serverUrl: null,
+    organizationName: null,
+    role: null,
+  });
+  let profile: Profile = signedOut();
+  const listeners = new Set<() => void>();
+  const notify = () => listeners.forEach((l) => l());
+  const currentMenu = () => (profile.isDemo ? menu : serverMenu);
+  const token43 = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   };
 
   const records: CaptureRecord[] = [];
@@ -74,15 +91,16 @@ export function createPreviewBridge(): Bridge {
       return { ...profile };
     },
     async setDisplayName(name) {
-      profile.displayName = name.trim() || null;
+      displayName = name.trim() || null;
+      profile.displayName = displayName;
       return { ...profile };
     },
     async menu() {
-      return menu.map((m) => ({ ...m }));
+      return currentMenu().map((m) => ({ ...m }));
     },
     async ingest(photo, details) {
       if (!sniff(photo)) throw new Error("only JPEG, PNG or WebP photos can be saved");
-      const dish = details.menuItemId ? menu.find((m) => m.id === details.menuItemId) : undefined;
+      const dish = details.menuItemId ? currentMenu().find((m) => m.id === details.menuItemId) : undefined;
       if (details.menuItemId && !dish) throw new Error("that dish is not on this menu");
       const bitmap = await createImageBitmap(new Blob([photo as BlobPart]), { imageOrientation: "from-image" });
       const full = await fit(bitmap, 2048);
@@ -100,10 +118,14 @@ export function createPreviewBridge(): Bridge {
         capturedAt: new Date().toISOString(),
         syncState: "pending",
         syncedAt: null,
-        locationId: dish ? LOCATION_ID : null,
+        locationId: profile.locationId,
         menuItemId: dish?.id ?? null,
         dishName: dish?.name ?? null,
         tableLabel: details.tableLabel?.trim() || null,
+        isDemo: profile.isDemo,
+        guestUrl: null,
+        guestExpiresAt: null,
+        lastSyncError: null,
       };
       records.unshift(record);
       return copy(record);
@@ -122,6 +144,51 @@ export function createPreviewBridge(): Bridge {
     },
     async selftest() {
       return "preview: no SQLite in the browser — run this on the device";
+    },
+    async signIn(serverUrl, login, password) {
+      if (!serverUrl.trim() || !login.trim() || !password) throw new Error("server address, sign-in name and password are required");
+      profile = {
+        displayName: "Maya",
+        locationId: serverLocation.id,
+        locationName: serverLocation.name,
+        isDemo: false,
+        signedIn: true,
+        serverUrl: serverUrl.trim(),
+        organizationName: "Atelier No. 8",
+        role: "server",
+      };
+      displayName = "Maya";
+      return { profile: { ...profile }, locations: [serverLocation] };
+    },
+    async signOut() {
+      profile = signedOut();
+      notify();
+      return { ...profile };
+    },
+    async refreshSession() {
+      if (!profile.signedIn) throw new Error("sign in again to sync");
+      return { profile: { ...profile }, locations: [serverLocation] };
+    },
+    async chooseLocation() {
+      return { ...profile };
+    },
+    async syncNow() {
+      if (!profile.signedIn) throw new Error("sign in again to sync");
+      let synced = 0;
+      for (const r of [...records].reverse()) {
+        if (r.syncState !== "pending" || r.isDemo) continue;
+        r.syncState = "synced";
+        r.syncedAt = new Date().toISOString();
+        r.guestUrl = `https://guests.preview.invalid/g/#${token43()}`;
+        r.guestExpiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+        synced++;
+      }
+      notify();
+      return { synced, refused: 0, remaining: 0, stopped: null };
+    },
+    async onSyncUpdated(callback) {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
     },
     async simulateAck() {
       const oldest = [...records].reverse().find((r) => r.syncState === "pending");

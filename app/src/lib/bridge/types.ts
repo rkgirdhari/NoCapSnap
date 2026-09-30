@@ -15,6 +15,12 @@ export interface CaptureRecord {
   dishName: string | null;
   /** Staff reference kept on this device only (owner default M6). */
   tableLabel: string | null;
+  /** Made at the demo location: stays on this phone, never synced. */
+  isDemo: boolean;
+  /** `<server>/g/#<token>` once the server acknowledged the capture (W3a). */
+  guestUrl: string | null;
+  guestExpiresAt: string | null;
+  lastSyncError: string | null;
 }
 
 export interface MenuItem {
@@ -30,6 +36,29 @@ export interface Profile {
   locationId: string | null;
   locationName: string | null;
   isDemo: boolean;
+  signedIn: boolean;
+  serverUrl: string | null;
+  organizationName: string | null;
+  role: string | null;
+}
+
+export interface RemoteLocation {
+  id: string;
+  name: string;
+  timezone: string;
+}
+
+export interface Session {
+  profile: Profile;
+  locations: RemoteLocation[];
+}
+
+export interface SyncReport {
+  synced: number;
+  refused: number;
+  remaining: number;
+  /** Why the run stopped early, if it did. */
+  stopped: string | null;
 }
 
 export interface StoreStatus {
@@ -68,6 +97,13 @@ export interface Bridge {
   /** The processed photo (or its thumbnail) as a JPEG blob. */
   media(sha256: string, thumb: boolean): Promise<Blob>;
   selftest(): Promise<string>;
+  signIn(serverUrl: string, login: string, password: string): Promise<Session>;
+  signOut(): Promise<Profile>;
+  refreshSession(): Promise<Session>;
+  chooseLocation(locationId: string): Promise<Profile>;
+  syncNow(): Promise<SyncReport>;
+  /** Called after every sync run (background or manual); returns an unsubscribe function. */
+  onSyncUpdated(callback: () => void): Promise<() => void>;
   /** Debug builds only: stands in for the server acknowledging the oldest pending capture. */
   simulateAck(): Promise<CaptureRecord | null>;
 }

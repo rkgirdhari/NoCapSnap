@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppInfo, Bridge, CaptureRecord, MenuItem, Profile, StoreStatus } from "./types";
+import { listen } from "@tauri-apps/api/event";
+import type { AppInfo, Bridge, CaptureRecord, MenuItem, Profile, Session, StoreStatus, SyncReport } from "./types";
 
 // Android's WebView can't hand a request body to the app, so Tauri carries IPC
 // over postMessage as text there, and a Uint8Array would travel as a JSON list
@@ -41,5 +42,11 @@ export const deviceBridge: Bridge = {
     return new Blob([bytes], { type: "image/jpeg" });
   },
   selftest: () => invoke<string>("run_selftest"),
+  signIn: (serverUrl, login, password) => invoke<Session>("session_sign_in", { serverUrl, login, password }),
+  signOut: () => invoke<Profile>("session_sign_out"),
+  refreshSession: () => invoke<Session>("session_refresh"),
+  chooseLocation: (locationId) => invoke<Profile>("session_choose_location", { locationId }),
+  syncNow: () => invoke<SyncReport>("sync_now"),
+  onSyncUpdated: (callback) => listen("sync-updated", () => callback()),
   simulateAck: () => invoke<CaptureRecord | null>("simulate_ack"),
 };

@@ -3,13 +3,18 @@
   import Icon from "./Icon.svelte";
   // The mockup's chip, carrying the spec's words (Spec §3, owner default M5):
   // staff must never mistake a pending capture for a ready QR.
-  let { state }: { state: SyncState } = $props();
+  // Demo captures (made while signed out) never sync, so they say so instead.
+  let { state, demo = false }: { state: SyncState; demo?: boolean } = $props();
 </script>
 
-<span class="chip {state}">
-  <Icon name={state === "synced" ? "qr" : "hourglass"} size={16} />
-  {state === "synced" ? "Synced · QR ready" : "Saved offline · QR not ready"}
-</span>
+{#if demo}
+  <span class="chip demo"><Icon name="plate" size={16} /> Demo · stays on this phone</span>
+{:else}
+  <span class="chip {state}">
+    <Icon name={state === "synced" ? "qr" : "hourglass"} size={16} />
+    {state === "synced" ? "Synced · QR ready" : "Saved offline · QR not ready"}
+  </span>
+{/if}
 
 <style>
   .chip {
@@ -37,5 +42,9 @@
   .synced {
     color: var(--ok);
     background: var(--ok-bg);
+  }
+  .demo {
+    color: var(--secondary);
+    background: var(--card);
   }
 </style>

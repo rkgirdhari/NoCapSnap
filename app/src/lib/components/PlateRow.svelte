@@ -17,7 +17,7 @@
     {#if withDay}{whenLabel(capture.capturedAt)}{:else}{formatTime(capture.capturedAt)}{#if capture.tableLabel}&ensp;·&ensp;Table
         {capture.tableLabel}{/if}{/if}
   </span>
-  <span class="state"><Chip state={capture.syncState} /></span>
+  <span class="state"><Chip state={capture.syncState} demo={capture.isDemo} /></span>
   <span class="go"><Icon name="chevron-right" size={22} stroke={1.5} /></span>
 </a>
 

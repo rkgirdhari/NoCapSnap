@@ -5,6 +5,9 @@ import type { Bridge } from "./types";
 export type {
   AppInfo,
   Bridge,
+  RemoteLocation,
+  Session,
+  SyncReport,
   CaptureDetails,
   CaptureRecord,
   MenuItem,
@@ -37,6 +40,12 @@ const noDevice: Bridge = {
   media: unavailable,
   selftest: unavailable,
   simulateAck: unavailable,
+  signIn: unavailable,
+  signOut: unavailable,
+  refreshSession: unavailable,
+  chooseLocation: unavailable,
+  syncNow: unavailable,
+  onSyncUpdated: async () => () => {},
 };
 
 export const bridge: Bridge = inTauri ? deviceBridge : previewAllowed ? createPreviewBridge() : noDevice;

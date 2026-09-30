@@ -2,16 +2,16 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { bridge, type CaptureRecord, type Profile } from "$lib/bridge";
-  import ConceptQr from "$lib/components/ConceptQr.svelte";
+  import Chip from "$lib/components/Chip.svelte";
+  import GuestQr from "$lib/components/GuestQr.svelte";
   import Icon from "$lib/components/Icon.svelte";
   import Thumb from "$lib/components/Thumb.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
   import { whenLabel } from "$lib/format";
 
-  // One capture's guest invitation. The QR is only offered after the server
-  // has acknowledged the capture (Spec §3); W2 has no server, so a device
-  // build shows the "saved offline" state, and "synced" is reachable only
-  // through the debug-only acknowledgement in Settings.
+  // One capture's guest invitation. The QR exists only after the server has
+  // acknowledged the capture (Spec §3), and it encodes the link the server
+  // issued: `<server>/g/#<token>` (Spec §4).
   const clientId = page.url.searchParams.get("c");
   const fromCapture = page.url.searchParams.get("from") === "capture";
 
@@ -20,7 +20,7 @@
   let loaded = $state(false);
   let error = $state<string | null>(null);
 
-  onMount(async () => {
+  async function load() {
     try {
       [capture, profile] = await Promise.all([
         clientId ? bridge.get(clientId) : Promise.resolve(null),
@@ -31,12 +31,23 @@
     } finally {
       loaded = true;
     }
+  }
+
+  onMount(() => {
+    load();
+    // A plate that syncs while this screen is open turns into its QR.
+    let off: (() => void) | undefined;
+    bridge.onSyncUpdated(load).then((u) => (off = u));
+    return () => off?.();
   });
 
+  const expiry = new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric" });
   const synced = $derived(capture?.syncState === "synced");
+  const expired = $derived(!!capture?.guestExpiresAt && new Date(capture.guestExpiresAt) < new Date());
+  const showQr = $derived(synced && !!capture?.guestUrl && !expired);
   const where = $derived(
     [
-      profile && capture?.locationId === profile.locationId ? profile.locationName : null,
+      capture?.isDemo ? "Demo" : profile && capture?.locationId === profile.locationId ? profile.locationName : null,
       capture?.tableLabel ? `Table ${capture.tableLabel}` : null,
     ].filter((p): p is string => !!p),
   );
@@ -56,12 +67,19 @@
     <p class="muted center">{error ?? "It isn't on this device."}</p>
     <a class="btn primary block tall" href="/history">Back to history</a>
   {:else}
-    <h1 class="display center">{synced ? "Ready to share." : "Saved on this device."}</h1>
+    <h1 class="display center">{showQr ? "Ready to share." : synced ? "Synced." : "Saved on this device."}</h1>
 
-    <p class="state" class:synced>
-      <span class="badge" aria-hidden="true"><Icon name={synced ? "check" : "hourglass"} size={22} stroke={2.2} /></span>
-      {synced ? "Synced · QR ready" : "Saved offline · QR not ready"}
-    </p>
+    <div class="state-line">
+      {#if showQr}
+        <p class="state synced">
+          <span class="badge" aria-hidden="true"><Icon name="check" size={22} stroke={2.2} /></span> Synced · QR ready
+        </p>
+      {:else if synced}
+        <p class="state plain">Synced with your restaurant</p>
+      {:else}
+        <Chip state={capture.syncState} demo={capture.isDemo} />
+      {/if}
+    </div>
 
     <div class="card dish">
       <span class="pic"><Thumb sha256={capture.sha256} alt="" /></span>
@@ -75,18 +93,38 @@
       </span>
     </div>
 
-    {#if synced}
-      <div class="qr">
-        <ConceptQr seed={capture.sha256} />
-      </div>
-      <p class="concept">Concept QR · not live</p>
+    {#if showQr && capture.guestUrl}
+      <div class="qr"><GuestQr url={capture.guestUrl} /></div>
+      {#if capture.guestExpiresAt}
+        <p class="concept">One use · expires {expiry.format(new Date(capture.guestExpiresAt))}</p>
+      {/if}
       <p class="ask">Ask your guest to scan for private feedback.</p>
+    {:else if synced}
+      <p class="ask small">
+        {expired && capture.guestExpiresAt
+          ? `This plate's guest link expired on ${expiry.format(new Date(capture.guestExpiresAt))}.`
+          : "This plate's guest link isn't on this phone; its feedback may already be in."}
+      </p>
+    {:else if capture.isDemo}
+      <div class="qr-wait">
+        <Icon name="plate" size={34} stroke={1.3} />
+        <p>Demo plates stay on this phone and never get a guest QR.</p>
+      </div>
+      <p class="ask small">Sign in to your restaurant in Settings to share plates with guests.</p>
     {:else}
       <div class="qr-wait">
         <Icon name="hourglass" size={34} stroke={1.3} />
         <p>The guest QR appears here once this plate syncs.</p>
       </div>
-      <p class="ask small">It syncs when a connection to your restaurant is available. Sync isn't switched on in this build yet.</p>
+      <p class="ask small">
+        {#if !profile?.signedIn}
+          Sign in to your restaurant in Settings to sync.
+        {:else if capture.lastSyncError}
+          Last try: {capture.lastSyncError}. It will try again automatically.
+        {:else}
+          It syncs as soon as the restaurant's server can be reached.
+        {/if}
+      </p>
     {/if}
 
     <div class="actions">
@@ -98,7 +136,7 @@
       {/if}
     </div>
     <p class="helper center foot">
-      {synced ? "This invitation can expire or be revoked." : "Saved on this device first."}
+      {showQr ? "This invitation can expire or be revoked." : "Saved on this device first."}
     </p>
   {/if}
 </main>
@@ -113,16 +151,26 @@
   .invite .display {
     margin-top: 10px;
   }
+  .state-line {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+  }
   .state {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 12px;
-    margin: 16px 0;
+    margin: 0;
     font-size: 18px;
     font-weight: 600;
     letter-spacing: 0.01em;
-    color: var(--wait);
+  }
+  .state.synced {
+    color: var(--select);
+  }
+  .state.plain {
+    color: var(--ok);
+    font-size: 16px;
   }
   .badge {
     display: grid;
@@ -130,13 +178,6 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: var(--wait-bg);
-    color: var(--wait);
-  }
-  .state.synced {
-    color: var(--select);
-  }
-  .synced .badge {
     background: var(--select);
     color: var(--on-cta);
   }
@@ -172,11 +213,8 @@
   }
 
   .qr {
-    width: min(64%, 260px);
+    width: min(70%, 280px);
     margin: 22px auto 0;
-    padding: 18px;
-    border-radius: 18px;
-    background: var(--qr-paper);
   }
   .concept {
     margin: 10px 0 0;
