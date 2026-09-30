@@ -1,6 +1,6 @@
 # W3b — Deploy kit for the ZAP VPS, built and rehearsed
 
-Date: 2026-09-30 · Status: **Kit built and rehearsed locally; CI run pending; not yet on the VPS.** The owner opened W3b with *"Approved"*
+Date: 2026-09-30 · Status: **Kit built and rehearsed (locally and in CI, all green); not yet on the VPS.** The owner opened W3b with *"Approved"*
 after the D4 intake ([`W3-PROPOSAL-hosted-feedback-slice.md`](W3-PROPOSAL-hosted-feedback-slice.md)).
 
 Nobody from this project has access to the VPS, and nobody should: no keys or passwords are handled here. So W3b is
@@ -16,7 +16,8 @@ split:
 ## Gate W3b — Deploy kit (built + rehearsed; live deploy pending)
 Status: Built — kit and CI; the VPS itself is Specified (not touched)
 Evidence: local run of the real install.sh with nginx and TLS: smoke 11/11; 2 mutations caught;
-          rollback drill; refusals checked. CI: first run pending
+          rollback drill; refusals checked. CI (run 36789703170, 93a9cb3): test, build and kit
+          rehearsal green on real systemd 255 + nginx; smoke 11/11; systemd-analyze security 1.4 OK
           server 10 tests (1 new), sync e2e 6, onboard 17; shellcheck, actionlint clean
 Changes: nocapsnap/deploy/ (new), .github/workflows/capsnap-server.yml (new),
          server: `version` command, rollback-tolerant migrations (+ test)
@@ -137,15 +138,38 @@ The outside-in checks in `smoke.sh`:
 - **Clippy:** `-D warnings` is clean.
 - **Scripts:** shellcheck is clean on every script, and actionlint 1.7.7 (with shellcheck) is clean on the workflow.
 
-**CI** (GitHub Actions, `ubuntu-24.04` runners): **pending.** The first run on PR #1 had started when this report
-was committed. Its results replace this line, and until then the CI-backed labels below read as **Specified**.
+**CI** (GitHub Actions, `ubuntu-24.04` runners). Run 36789703170, on commit `93a9cb3`:
+
+| Job | Result |
+|---|---|
+| Test: fmt, clippy `-D warnings`, server and ONB-1 tests, shellcheck | success (1 min 40 s) |
+| Build: static musl binary, sha256, artifact | success |
+| Kit rehearsal on real systemd 255, nginx 1.24 and Ubuntu 24.04.5 (IPv4 only) | success |
+| Deploy | skipped: runs only by hand from `main` |
+
+Rehearsal highlights:
+
+- **Preflight passed:** "systemd 255", "DNS: capsnap.test points at this box".
+- **Install:** release activated; https health through nginx OK.
+- **`smoke.sh`:** **11/11 PASS**, including "port 8090 does not answer from outside".
+- **The unit:**
+  - `systemctl show`: `User=capsnap`, `LogNamespace=capsnap`, `ActiveState=active`;
+  - `systemd-analyze security`: **"Overall exposure level for capsnap.service: 1.4 OK"**;
+  - the server's logs went to the `capsnap` journal namespace.
+- **Permissions:** `/var/lib/capsnap` is `capsnap:capsnap 700`; `capsnap.env` is `root:capsnap 640`.
+- **`capsnapctl`:** create-org and create-location worked under the sandbox.
+- **Broken release:** "failed its health check … switched back"; `health: ok`; smoke 11/11 again.
+- **Re-running install:** no new release.
+
+**The first CI run failed on one check.** CI's own test certificate was issued for 2 days, and `smoke.sh` correctly
+refuses a certificate with under 14 days left. The fixture was fixed; the check itself was not changed.
 
 ## Labels
 
 | Item | Label | Why |
 |---|---|---|
 | Deploy kit: install, release switching, rollback, admin wrapper, smoke test, nginx blocks | **Built** | Local rehearsal above, and the CI `kit` job |
-| systemd sandbox and 30-day journald namespace | **Built** on systemd 255 (CI runner) | On the VPS: **Specified** until preflight shows its systemd version |
+| systemd sandbox (exposure 1.4) and 30-day journald namespace | **Built** on systemd 255 (CI runner) | On the VPS: **Specified** until preflight shows its systemd version |
 | Static musl binary | **Built** | CI `build` job |
 | Let's Encrypt via certbot webroot | **Specified** | Needs a public domain; no test can reach Let's Encrypt |
 | The deploy job (GitHub Actions to the VPS) | **Specified** | Needs the secrets, `VPS_KNOWN_HOSTS` and `CAPSNAP_DOMAIN`; never run |
