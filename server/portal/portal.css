@@ -1,0 +1,30 @@
+/* NO CAP SNAP guest page. System fonts only (Spec §6); same palette as the staff app. */
+:root {
+  --bg: #190926; --card: #2a1b27; --edge: #7a625e; --headline: #fce9c5; --text: #f4e8da;
+  --muted: #a1949b; --cta: #fdcf10; --on-cta: #110803; --select: #f9ce22; --danger: #ff9c8f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 480px; margin: 0 auto; padding: 24px 18px 40px; }
+.wordmark { margin: 0 0 28px; font-size: 12px; letter-spacing: 0.3em; text-align: center; }
+h1 { margin: 0 0 12px; font: 700 32px/1.1 "Noto Serif", Georgia, serif; color: var(--headline); letter-spacing: -0.02em; }
+.muted { color: var(--muted); }
+.small { font-size: 13.5px; }
+.dish { margin: 0 0 16px; font-size: 17px; }
+.place { display: block; margin-top: 4px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+#photo { width: 100%; max-height: 50vh; object-fit: cover; border-radius: 14px; margin-bottom: 18px; }
+fieldset { margin: 0 0 18px; padding: 0; border: 0; }
+legend { margin-bottom: 10px; font-size: 15px; }
+.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.scale label { position: relative; }
+.scale input { position: absolute; opacity: 0; inset: 0; margin: 0; }
+.scale span { display: grid; place-items: center; min-height: 56px; border-radius: 12px; border: 1.5px solid var(--edge); background: var(--card); font-size: 20px; font-weight: 650; }
+.scale input:checked + span { border-color: var(--select); background: #3a2827; }
+.scale input:focus-visible + span { outline: 2px solid var(--select); outline-offset: 2px; }
+.comment { display: block; margin-bottom: 8px; }
+textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--edge); background: #402c2e; color: var(--text); font: inherit; resize: vertical; }
+.count { margin: 4px 0 16px; text-align: right; font-size: 13px; }
+button.primary { width: 100%; min-height: 54px; border: 0; border-radius: 12px; background: var(--cta); color: var(--on-cta); font: 650 17px system-ui, sans-serif; cursor: pointer; }
+button.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.error { color: var(--danger); font-weight: 600; }

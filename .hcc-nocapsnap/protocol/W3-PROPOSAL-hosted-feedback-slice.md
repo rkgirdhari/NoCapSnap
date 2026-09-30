@@ -1,6 +1,7 @@
 # W3 — Hosted feedback slice (PROPOSAL)
 
-Date: 2026-09-30 · Status: **Proposed. Not started; nothing is built until the owner approves.**
+Date: 2026-09-30 · Status: **W3a approved and opened by the owner** (*"Approved, open W3a"*, 2026-09-30).
+W3b is still waiting on D4, G1 and G2. D9 and R1 are unanswered; R1's recommendation (test data only) applies.
 
 Spec §7 Phase 3: *"Deploy the Axum/SQLite backend to a verified vServer and implement the fragment-based guest
 portal."* Spec §7's runbook makes the hosting check a **hard gate**: *"Axum requires a long-running Linux

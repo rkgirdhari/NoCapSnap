@@ -10,7 +10,8 @@ description = "CapSnap onboarding import: consent-based read of a restaurant's o
 [workspace]
 
 [dependencies]
-reqwest = { version = "0.13.5", default-features = false }
+# rustls: every real restaurant site is https (W3a finding: W2 shipped without a TLS backend).
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
 scraper = "0.27.0"
 url = "2.5.8"
 serde = { version = "1", features = ["derive"] }

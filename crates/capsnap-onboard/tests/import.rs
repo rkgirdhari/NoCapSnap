@@ -344,6 +344,14 @@ async fn the_default_policy_refuses_internal_addresses_before_connecting() {
         );
     }
     assert!(server.hits().is_empty(), "the server was never contacted");
+
+    // Real sites are https. W2 built this crate without a TLS backend, so
+    // every https request failed before DNS; this pins that down.
+    let https = pinned(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    assert_eq!(
+        import("https://atelier8.test/", &consent("https://atelier8.test/"), &https).await,
+        Err(ImportError::BlockedAddress("atelier8.test".into()))
+    );
 }
 
 #[test]
