@@ -60,8 +60,8 @@
     align-items: center;
     justify-content: space-between;
     padding: calc(12px + env(safe-area-inset-top)) var(--gutter) 12px;
-    background: var(--paper);
-    border-bottom: 1px solid var(--hairline);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
   }
 
   .brand {
@@ -81,8 +81,8 @@
   .ribbon {
     margin: 0;
     padding: 7px var(--gutter);
-    background: var(--indigo-tint);
-    color: var(--indigo);
+    background: var(--bg-deep);
+    color: var(--text-muted);
     font-size: 12.5px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -103,8 +103,8 @@
     grid-template-columns: repeat(4, 1fr);
     height: calc(var(--tabbar) + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
-    background: var(--paper-raised);
-    border-top: 1px solid var(--hairline);
+    background: var(--bg-deep);
+    border-top: 1px solid var(--line);
   }
 
   .tab {
@@ -114,7 +114,7 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -122,10 +122,10 @@
   }
 
   .tab.active {
-    color: var(--ink);
+    color: var(--accent);
   }
 
-  /* A single lacquer stroke marks where you are. */
+  /* A single gold stroke marks where you are. */
   .tab.active::before {
     content: "";
     position: absolute;
@@ -134,6 +134,6 @@
     right: 26%;
     height: 2px;
     border-radius: 0 0 2px 2px;
-    background: var(--lacquer);
+    background: var(--accent);
   }
 </style>

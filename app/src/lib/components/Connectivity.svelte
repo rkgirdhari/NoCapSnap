@@ -14,14 +14,14 @@
     gap: 7px;
     padding: 5px 11px;
     border-radius: 999px;
-    border: 1px solid var(--hairline);
-    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    background: var(--chip);
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--matcha);
+    color: var(--success);
   }
   .net.offline {
-    color: var(--indigo);
+    color: var(--pending);
   }
   .dot {
     width: 7px;

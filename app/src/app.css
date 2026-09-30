@@ -1,29 +1,43 @@
 /*
- * CapSnap design language — "the pass at a quiet, very good restaurant".
- * Asian-fusion materials (washi paper, sumi ink, urushi lacquer, kintsugi
- * gold, aizome indigo) with Midwestern plainness: honest wood tones, sturdy
- * controls, nothing ornamental that doesn't earn its place.
+ * CapSnap brand — Royal Purple + Gold + Bamboo (owner direction, W1/D8).
+ * Luxury hospitality: fine dining, concierge service, spa-like calm.
+ *
+ * The six brand colours are used exactly as specified. Where a brand
+ * colour fails WCAG AA for small text on the surface it sits on, a
+ * text-safe step of the same hue is used for that text only (ratios in
+ * the W1 gate report):
+ *   Muted Gold #B7791F on purple is 4.18:1 → small text uses #C18A39 (5.05:1)
+ *   Muted Gold on Bamboo Brown is 2.28:1  → card labels use #E6CA95 (5.24:1)
  * System fonts only — the spec forbids external font loading (§6).
  */
 :root {
-  --paper: #f4eee2;
-  --paper-raised: #fbf8f2;
-  --paper-sunk: #eae1cf;
-  --ink: #1d1915;
-  --ink-soft: #4b433b;
-  --ink-muted: #7b7064;
-  --hairline: rgba(29, 25, 21, 0.12);
-  --gold: #a8844f;
-  --lacquer: #9a2b22;
-  --lacquer-press: #7e2019;
-  --on-lacquer: #fbf4ea;
-  --lacquer-tint: #f3e0da;
-  --indigo: #2c3b5a;
-  --indigo-tint: #e2e6ee;
-  --matcha: #4f6139;
-  --matcha-tint: #e4e9d8;
-  --walnut: #5a3f2e;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 10px 30px -18px rgba(60, 40, 20, 0.35);
+  /* Brand */
+  --royal-purple: #2d1b4e;
+  --dark-purple: #1a1a2e;
+  --bamboo-brown: #744210;
+  --gold: #f6e05e;
+  --bamboo-green: #68d391;
+  --muted-gold: #b7791f;
+
+  /* Roles */
+  --bg: var(--royal-purple);
+  --bg-deep: #22143c; /* sunken areas: segmented control, notes */
+  --surface: var(--bamboo-brown); /* cards: a lacquered bamboo tray */
+  --surface-edge: var(--muted-gold);
+  --text: #fbf7ee; /* ivory: 14.3:1 on purple, 7.8:1 on bamboo */
+  --text-soft: #e3dcd0;
+  --text-muted: #c18a39; /* text-safe muted gold on purple */
+  --on-surface-muted: #e6ca95; /* labels on bamboo cards */
+  --line: rgba(183, 121, 31, 0.35);
+  --accent: var(--gold);
+  --accent-press: #ecc94b;
+  --on-accent: var(--royal-purple);
+  --success: var(--bamboo-green);
+  --pending: var(--gold);
+  --chip: #201a38; /* status chips read on purple and on bamboo */
+  --danger: #feb2b2;
+  --danger-tint: rgba(254, 178, 178, 0.12);
+  --shadow: 0 1px 0 rgba(246, 224, 94, 0.14) inset, 0 14px 34px -20px rgba(0, 0, 0, 0.75);
 
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Noto Serif",
     "Source Serif Pro", Georgia, serif;
@@ -36,31 +50,15 @@
   --gutter: 20px;
   --tabbar: 64px;
 
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  /* "Night service": the same materials under low light. */
+  /* OLED / night: the darker brand base; cards and accents stay on brand. */
   :root {
-    --paper: #15120f;
-    --paper-raised: #1e1a16;
-    --paper-sunk: #0f0d0b;
-    --ink: #f1e9dc;
-    --ink-soft: #cfc4b4;
-    --ink-muted: #9a8e80;
-    --hairline: rgba(241, 233, 220, 0.12);
-    --gold: #c4a06a;
-    --lacquer: #c24a3c;
-    --lacquer-press: #a83c30;
-    --on-lacquer: #fff6ec;
-    --lacquer-tint: rgba(194, 74, 60, 0.16);
-    --indigo: #a9b8da;
-    --indigo-tint: rgba(169, 184, 218, 0.14);
-    --matcha: #aec190;
-    --matcha-tint: rgba(174, 193, 144, 0.14);
-    --walnut: #c9a98c;
-    --shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.8);
-    color-scheme: dark;
+    --bg: var(--dark-purple);
+    --bg-deep: #141424;
+    --chip: #12121f;
   }
 }
 
@@ -72,15 +70,14 @@
 
 html,
 body {
-  margin: 0;
-  min-height: 100%;
-}
-
-body {
-  background-color: var(--paper);
-  /* Washi grain: a faint fibre noise, inline so nothing is fetched. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  color: var(--ink);
+  background-color: var(--bg);
+  /* A soft pool of light from above, like a dining room at service, plus a
+     faint velvet grain drawn inline so nothing is fetched. */
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(246, 224, 94, 0.07), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .9 0 0 0 0 .6 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+  color: var(--text);
   font-family: var(--sans);
   font-size: 16px;
   line-height: 1.5;
@@ -108,7 +105,7 @@ h3 {
 
 .kicker {
   margin: 0 0 10px;
-  color: var(--walnut);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -116,23 +113,27 @@ h3 {
 }
 
 .lede {
-  color: var(--ink-soft);
+  color: var(--text-soft);
   margin: 14px 0 0;
   max-width: 34ch;
 }
 
-/* The gold hairline that stands in for a brush stroke between sections. */
+/* A length of bamboo: muted-gold segments with small nodes between them. */
 .rule {
-  height: 1px;
+  height: 2px;
   border: 0;
   margin: 26px 0;
-  background: linear-gradient(90deg, transparent, var(--gold) 18%, var(--gold) 82%, transparent);
-  opacity: 0.55;
+  background: repeating-linear-gradient(90deg, var(--muted-gold) 0 64px, transparent 64px 70px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  opacity: 0.75;
 }
 
 .card {
-  background: var(--paper-raised);
-  border: 1px solid var(--hairline);
+  /* Bamboo tray: brand brown with a faint lacquer sheen and a muted-gold edge
+     (brown on purple alone is only 1.84:1, so the edge carries the shape). */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
+  border: 1px solid var(--surface-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 18px;
@@ -164,7 +165,7 @@ h3 {
 .btn:focus-visible,
 .tab:focus-visible,
 .segment button:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -174,18 +175,19 @@ h3 {
 }
 
 .btn.primary {
-  background: var(--lacquer);
-  color: var(--on-lacquer);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 8px 22px -12px rgba(246, 224, 94, 0.55);
 }
 
 .btn.primary:active {
-  background: var(--lacquer-press);
+  background: var(--accent-press);
 }
 
 .btn.quiet {
   background: transparent;
-  border-color: color-mix(in srgb, var(--ink) 28%, transparent);
-  color: var(--ink);
+  border-color: var(--muted-gold);
+  color: var(--text);
 }
 
 .btn.block {
@@ -199,7 +201,13 @@ h3 {
 }
 
 .muted {
-  color: var(--ink-muted);
+  color: var(--text-muted);
+}
+
+/* On bamboo cards muted gold drops to 2.28:1, so muted text turns pale gold. */
+.card .muted,
+.on-surface .muted {
+  color: var(--on-surface-muted);
 }
 
 .visually-hidden {

@@ -26,7 +26,7 @@
 
 <hr class="rule" />
 
-<section class="ledger" aria-label="Tonight at a glance" aria-busy={!loaded}>
+<section class="ledger on-surface" aria-label="Tonight at a glance" aria-busy={!loaded}>
   <div class="tile">
     <span class="figure">{today}</span>
     <span class="label">Plated today</span>
@@ -52,9 +52,9 @@
   .ledger {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    border: 1px solid var(--hairline);
+    border: 1px solid var(--surface-edge);
     border-radius: var(--radius);
-    background: var(--paper-raised);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
     box-shadow: var(--shadow);
   }
 
@@ -66,7 +66,7 @@
   }
 
   .tile + .tile {
-    border-left: 1px solid var(--hairline);
+    border-left: 1px solid color-mix(in srgb, var(--muted-gold) 70%, transparent);
   }
 
   .figure {
@@ -77,15 +77,15 @@
   }
 
   .figure.pending {
-    color: var(--indigo);
+    color: var(--accent);
   }
 
   .figure.synced {
-    color: var(--matcha);
+    color: var(--success); /* 4.47:1 on bamboo: passes as large text only, which it is */
   }
 
   .label {
-    color: var(--ink-muted);
+    color: var(--on-surface-muted);
     font-size: 12.5px;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -98,10 +98,10 @@
   .note {
     margin-top: 22px;
     padding: 14px 16px;
-    border-left: 2px solid var(--gold);
-    color: var(--ink-soft);
+    border-left: 2px solid var(--muted-gold);
+    color: var(--text-soft);
     font-size: 14px;
-    background: color-mix(in srgb, var(--paper-sunk) 55%, transparent);
+    background: var(--bg-deep);
     border-radius: 0 10px 10px 0;
   }
 </style>

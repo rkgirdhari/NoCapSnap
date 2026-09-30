@@ -1,8 +1,8 @@
 # W1 — Tauri Android shell + camera spike (+ staff UI design language)
 
 Date: 2026-09-30 · Branch: `ccr-8308799d-xptdcx` (PR #1) · Spec: [`../spec/SPEC-v1-operations-technical.md`](../spec/SPEC-v1-operations-technical.md)
-Approved by owner: D1 (open W1), D2 (a) (remove the Expo prototype). Owner direction during W1: build the staff
-UI as *"Asian fusion with Midwestern simplicity of genuine craftsmanship in a high-end five-star restaurant"*.
+Approved by owner: D1 (open W1), D2 (a) (remove the Expo prototype). Owner direction during W1: a staff UI in
+*"Asian fusion with Midwestern simplicity…"*, then refined to the **Royal Purple + Gold + Bamboo** brand (D8).
 
 ## Gate report
 
@@ -61,26 +61,48 @@ stay in git history; the last commit containing them is `7604304`.
 - **Preview mode:** outside Tauri, the bridge switches to an in-memory implementation behind a "Browser preview ·
   nothing is saved" ribbon, so the UI can be reviewed in a desktop browser (`pnpm dev`).
 
-### Design language (owner direction)
+### Design language: Royal Purple + Gold + Bamboo (owner decision D8)
 
-"The pass at a quiet, very good restaurant." Tokens are in `app/src/app.css`.
+The first pass ("Asian fusion with Midwestern simplicity", in washi, lacquer and indigo) was replaced by the owner's
+refined brand: **luxury hospitality, premium dining, spa-like exclusivity**. Tokens are in `app/src/app.css`. The
+six brand colours are used exactly as specified:
 
-| Element | Asian-fusion material | Midwestern plainness |
+| Role | Brand colour | Where it appears |
 |---|---|---|
-| Background | Washi paper `#F4EEE2`, faint fibre grain drawn inline as SVG noise (nothing fetched) | — |
-| Text | Sumi ink `#1D1915`, serif headlines from the phone's own serif (Noto Serif on Android) | Plain, specific copy: "It stays on this phone until the server confirms it" |
-| Primary action | Urushi lacquer `#9A2B22` | 52 px targets for wet or gloved hands |
-| Pending / synced | Aizome indigo (also denim) / matcha | The spec's exact wording: "Saved offline · QR not ready", "Synced · QR ready" |
-| Accents | Kintsugi gold hairlines and corner marks | Walnut kickers, no ornament that doesn't do a job |
-| Signature moments | A hanko seal wordmark; a "Saved · on this phone" stamp pressed onto the photo; an ensō-stroke shutter | A plate-from-above guide showing where the dish goes |
-| Night service | A dark theme from the same materials (`prefers-color-scheme`) | — |
+| Primary background | Royal Purple `#2D1B4E` | App base, masthead, Android launch window and adaptive-icon background |
+| Dark mode | Dark Purple `#1A1A2E` | Base under `prefers-color-scheme: dark` (OLED); cards and accents stay on brand |
+| Card / border | Bamboo Brown `#744210` | Cards as "bamboo trays" (a faint sheen plus a muted-gold edge); the camera frame |
+| Accent / CTA | Gold Sunshine `#F6E05E` | Primary buttons (purple text), the active tab, seal, stamp, ensō shutter, corner marks, the "waiting" chip |
+| Success / online | Bamboo Green `#68D391` | "Synced · QR ready", Online badge, the QR-ready figure |
+| Secondary | Muted Gold `#B7791F` | Hairlines, card edges, quiet-button borders, the bamboo-node divider |
 
-There are no external fonts, images or scripts (Spec §6). Headlines use the device's serif font; there are no
-webfont files.
+Also:
+
+- **Text:** ivory `#FBF7EE` (the brief didn't name a primary text colour).
+- **Kept from the first pass:** the serif headlines (device fonts only), the gold hanko seal, the "Saved · on this
+  phone" stamp and the ensō shutter.
+- **New:** section dividers drawn as a length of bamboo (muted-gold segments with small nodes), and a soft pool of
+  gold light over velvet grain on the page background. Both are drawn in CSS or inline SVG, so nothing is fetched.
+
+#### Contrast (WCAG 2.x relative luminance, computed, not estimated)
+
+| Pair | Brief said | Measured | Result | Action |
+|---|---|---|---|---|
+| Gold on Royal Purple | 7.2:1 | **11.42:1** | AAA | — |
+| Bamboo Green on Royal Purple | 5.8:1 | **8.21:1** | AAA | — |
+| Gold on Bamboo Brown | "4…" (message cut off) | **6.22:1** | AA | — |
+| Royal Purple on Gold (button text) | — | 11.42:1 | AAA | — |
+| Ivory on Royal Purple / Bamboo / Dark Purple | — | 14.25 / 7.77 / 15.95 | AAA | — |
+| **Muted Gold on Royal Purple** | — | **4.18:1** | fails AA for small text | Small labels and timestamps use `#C18A39` (5.05:1). `#B7791F` stays for lines and borders (non-text needs ≥ 3:1) |
+| **Muted Gold on Bamboo Brown** | — | **2.28:1** | fails | Labels on cards use pale gold `#E6CA95` (5.24:1) |
+| Bamboo Green on Bamboo Brown | — | 4.47:1 | large text only | Only the 38 px "QR ready" figure uses it; status chips sit on a dark chip (`#201A38`: gold 12.4:1, green 8.9:1) |
+| Bamboo Brown against Royal Purple (card edge) | — | 1.84:1 | shape unclear | Cards get a Muted Gold border (4.18:1 against the purple) |
+
+There are no external fonts, images or scripts (Spec §6).
 
 Screens: **Home** (service line, today's plates / waiting / QR ready), **Capture** (a choice between two camera
 routes → live viewfinder with the shutter over the image → review → stamped receipt), **History** (grouped by
-day, a status pill per plate) and **Manager** (Phase 3 placeholders plus the W1 device check).
+day, time plus status chip, digest beneath) and **Manager** (Phase 3 placeholders plus the W1 device check).
 
 ## Camera: what the code says (wry 0.57.0, `RustWebChromeClient.kt`)
 
@@ -188,11 +210,15 @@ home figures: 2 / 1 / 1        page errors: none
 ## Device checklist (owner, about 10 minutes, Android 16 phone with USB debugging)
 
 ```bash
-adb install -r capsnap-w1-arm64-release-debugsigned.apk   # the 9.6 MB APK sent with this gate report
+# Use the Royal Purple build (capsnap-w1-purple-arm64-release-debugsigned.apk). It is signed with a different
+# debug key from the first (lacquer) test APK, so remove that one first:
+adb uninstall com.hammurabicoding.nocapsnap
+adb install capsnap-w1-purple-arm64-release-debugsigned.apk
 # or build it yourself: ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… nocapsnap/app/scripts/build-android.sh
 ```
 
-1. Open CapSnap. The masthead and tab bar should not sit under the status bar or navigation bar.
+1. Open CapSnap. The launch screen should be purple (no white flash). The masthead and tab bar should not sit under
+   the status bar or navigation bar. The launcher icon should show the gold plate and check on purple.
 2. **Capture → In-app viewfinder → Start camera.** The Android camera prompt should appear only now. Allow it.
    Take a photo, then **Save plate**. Expect the "Saved offline" stamp.
 3. **Capture → Phone camera → Open camera app.** The system camera should open. Take a photo. It should come back
@@ -211,8 +237,15 @@ Report back for each step: pass or fail, plus a screenshot of anything that look
   spec's hard gate by itself. That needs the device checklist.
 - **The design was judged in desktop Chromium.** Android WebView versions, OEM serif fonts (Noto Serif versus
   Samsung's) and dark-mode forcing (`FORCE_DARK`) may render differently.
-- **The ensō, hanko and washi motifs are my interpretation of a one-line brief.** They risk reading as themed
-  rather than refined. The owner should judge them on a real phone before W2 builds more screens on them.
+- **The brand is dark by construction.** Royal Purple is the "light" theme, so there is no light mode. A bright
+  kitchen pass under strong lights may favour a light surface; this needs judging on a phone at the pass.
+- **Bamboo-brown cards are large, warm slabs on a cool purple.** It's the specified pairing, but brown and purple
+  only separate at 1.84:1, so the muted-gold edge carries the shape. On a low-brightness phone that edge may
+  disappear.
+- **Two text-safe variants were added** (`#C18A39`, `#E6CA95`) because the brand's Muted Gold fails AA for small
+  text. They are hue-matched, but they are not in the brand sheet and need the owner's sign-off.
+- **The hanko seal, stamp and ensō shutter carried over from the first pass.** They now read as gold-on-purple
+  luxury marks, but they were designed for a different brief.
 - **Preview mode ships in the same bundle.** It is chosen at runtime by the presence of Tauri, so the in-memory
   bridge is dead code on the device. W2 should strip it from release builds.
 - **`simulate_ack` is a fake server acknowledgement inside the app.** It must be removed before any beta (W5),
@@ -230,6 +263,12 @@ Report back for each step: pass or fail, plus a screenshot of anything that look
 - **D7 — Device checklist.** Run it (above) and approve W1 → W2 (local vertical slice)? Yes/No.
 - **D5 (carried from W0, now answerable).** Ship route B only, without `CAMERA`, so there are no runtime permissions,
   or keep route A (the in-app viewfinder, needs `CAMERA`)? Decide after the checklist.
-- **D8 — Design.** Does the direction on the phone match your brief? Name anything to push further (more lacquer,
-  less gold, a different serif feel) before W2 multiplies it across screens.
-- **D4, D6 (open from W0).** Zap hosting plan; minSdk. W1 kept 24.
+- **D8 — Design: answered** with Royal Purple + Gold + Bamboo, now applied. Remaining question: approve the two
+  text-safe muted-gold variants (`#C18A39` on purple, `#E6CA95` on bamboo) as part of the brand?
+- **D4 — Hosting (in progress).** The owner indicated a ZAP-Hosting **Linux VPS**, which would satisfy the Axum
+  requirement (a long-running Linux process). The five uploaded guides (`LINUX_VPS`, `NETWORK_CONFIG`,
+  `SERVER_SETUP`, `WINDOWS_SERVER_2022`, `LIFETIME_LICENSE_GUIDE`) contain only a title and byline, so the plan is
+  **not yet verified**. Evidence needed to close D4: the ZAP product name for the plan, plus the output of
+  `uname -a; systemctl --version | head -1; nproc; free -h; df -h /` run over SSH on the server. Don't send
+  passwords or keys.
+- **D6 (open from W0).** minSdk; W1 kept 24.

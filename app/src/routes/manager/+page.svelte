@@ -99,18 +99,18 @@
     justify-content: space-between;
     min-height: 56px;
     font-weight: 600;
-    color: var(--ink-soft);
+    color: var(--text);
   }
 
   .rows li + li {
-    border-top: 1px solid var(--hairline);
+    border-top: 1px solid color-mix(in srgb, var(--muted-gold) 70%, transparent);
   }
 
   .tag {
     padding: 4px 10px;
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent);
-    color: var(--walnut);
+    border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+    color: var(--accent);
     font-size: 12px;
     letter-spacing: 0.06em;
   }
@@ -123,7 +123,7 @@
   }
 
   dt {
-    color: var(--ink-muted);
+    color: var(--on-surface-muted);
     font-size: 13.5px;
     font-weight: 600;
   }
@@ -149,14 +149,14 @@
   .result {
     padding: 10px 12px;
     border-radius: 10px;
-    background: var(--paper-sunk);
+    background: var(--chip);
     font-size: 13.5px;
   }
 
   .colophon {
     margin: 34px 0 0;
     text-align: center;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font-size: 12.5px;
     letter-spacing: 0.04em;
   }

@@ -42,14 +42,12 @@
 {:else}
   {#each groups as group (group.label)}
     <h2 class="day">{group.label}</h2>
-    <ul class="ledger">
+    <ul class="ledger on-surface">
       {#each group.items as c (c.clientId)}
         <li>
           <span class="time">{formatTime(c.capturedAt)}</span>
-          <span class="meta">
-            <StatusPill state={c.syncState} />
-            <span class="mono muted">#{shortDigest(c.sha256)} · {formatBytes(c.bytes)}</span>
-          </span>
+          <span class="state"><StatusPill state={c.syncState} /></span>
+          <span class="mono muted meta">#{shortDigest(c.sha256)} · {formatBytes(c.bytes)}</span>
         </li>
       {/each}
     </ul>
@@ -64,41 +62,50 @@
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--walnut);
+    color: var(--text-muted);
   }
 
   .ledger {
     list-style: none;
     margin: 0;
-    padding: 0 18px;
-    border: 1px solid var(--hairline);
+    padding: 0 14px;
+    border: 1px solid var(--surface-edge);
     border-radius: var(--radius);
-    background: var(--paper-raised);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
     box-shadow: var(--shadow);
   }
 
+  /* Time and status on one line, digest beneath: the status chip keeps its
+     full wording without crowding the card edge on a narrow phone. */
   li {
     display: grid;
-    grid-template-columns: 88px 1fr;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "time state"
+      "meta meta";
     align-items: center;
-    gap: 12px;
-    padding: 16px 0;
+    gap: 6px 12px;
+    padding: 14px 0;
   }
 
   li + li {
-    border-top: 1px solid var(--hairline);
+    border-top: 1px solid color-mix(in srgb, var(--muted-gold) 70%, transparent);
   }
 
   .time {
+    grid-area: time;
     font-family: var(--serif);
     font-size: 20px;
     font-variant-numeric: lining-nums tabular-nums;
   }
 
+  .state {
+    grid-area: state;
+    justify-self: end;
+  }
+
   .meta {
-    display: grid;
-    justify-items: start;
-    gap: 6px;
+    grid-area: meta;
   }
 
   .empty {
@@ -125,12 +132,12 @@
 
   .guide circle {
     fill: none;
-    stroke: var(--gold);
+    stroke: var(--accent);
     stroke-width: 1.6;
   }
 
   .guide circle + circle {
-    stroke: var(--lacquer);
+    stroke: var(--text);
     stroke-width: 1.2;
     opacity: 0.7;
   }

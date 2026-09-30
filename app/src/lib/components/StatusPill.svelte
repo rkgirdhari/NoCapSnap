@@ -19,6 +19,9 @@
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
+    /* A dark chip keeps gold/green text legible on purple and on bamboo. */
+    background: var(--chip);
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   }
   .dot {
     width: 7px;
@@ -27,11 +30,9 @@
     background: currentColor;
   }
   .pending {
-    color: var(--indigo);
-    background: var(--indigo-tint);
+    color: var(--pending);
   }
   .synced {
-    color: var(--matcha);
-    background: var(--matcha-tint);
+    color: var(--success);
   }
 </style>

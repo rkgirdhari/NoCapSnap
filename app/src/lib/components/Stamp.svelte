@@ -13,10 +13,10 @@
     place-items: center;
     gap: 2px;
     padding: 12px 16px 10px;
-    border: 3px double var(--lacquer);
+    border: 3px double var(--accent);
     border-radius: 8px;
-    color: var(--lacquer);
-    background: color-mix(in srgb, var(--paper-raised) 78%, transparent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--dark-purple) 74%, transparent);
     transform: rotate(-7deg);
     animation: press 420ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
   }

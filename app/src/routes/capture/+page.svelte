@@ -241,7 +241,8 @@
     margin: 24px 0 16px;
     padding: 4px;
     border-radius: 12px;
-    background: var(--paper-sunk);
+    background: var(--bg-deep);
+    border: 1px solid var(--line);
   }
 
   .segment button {
@@ -249,15 +250,15 @@
     border: 0;
     border-radius: 9px;
     background: transparent;
-    color: var(--ink-muted);
+    color: var(--text-muted);
     font: 600 14.5px/1 var(--sans);
     cursor: pointer;
   }
 
   .segment button[aria-selected="true"] {
-    background: var(--paper-raised);
-    color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 0 rgba(246, 224, 94, 0.18) inset;
   }
 
   .frame {
@@ -265,8 +266,8 @@
     aspect-ratio: 4 / 5;
     overflow: hidden;
     border-radius: 18px;
-    background: var(--paper-sunk);
-    border: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
+    border: 1px solid var(--surface-edge);
   }
 
   /* Keep the next action above the tab bar on a phone screen. */
@@ -294,7 +295,7 @@
     position: absolute;
     width: 22px;
     height: 22px;
-    border-color: var(--gold);
+    border-color: var(--accent);
     border-style: solid;
     border-width: 0;
     opacity: 0.9;
@@ -315,7 +316,7 @@
     gap: 16px;
     padding: 32px;
     text-align: center;
-    color: var(--ink-soft);
+    color: var(--text-soft);
   }
 
   .empty p {
@@ -334,14 +335,14 @@
 
   .guide circle {
     fill: none;
-    stroke: var(--gold);
+    stroke: var(--accent);
     stroke-width: 1.6;
   }
 
   .guide circle + circle {
-    stroke: var(--ink);
+    stroke: var(--text);
     stroke-width: 1;
-    opacity: 0.25;
+    opacity: 0.3;
   }
 
   .scrim {
@@ -353,7 +354,7 @@
   }
 
   .picker:focus-within {
-    outline: 2px solid var(--gold);
+    outline: 2px solid var(--accent);
     outline-offset: 3px;
   }
 
@@ -367,8 +368,8 @@
     margin: 14px 0 0;
     padding: 12px 14px;
     border-radius: 10px;
-    background: var(--lacquer-tint);
-    color: var(--lacquer);
+    background: var(--danger-tint);
+    color: var(--danger);
     font-size: 14.5px;
     font-weight: 600;
   }
@@ -387,7 +388,7 @@
     width: 100%;
   }
 
-  /* The shutter is an ensō: one confident stroke around a lacquer centre,
+  /* The shutter is an ensō: one confident gold stroke around a gold centre,
      floating over the viewfinder like a camera app's. */
   .shutter {
     position: absolute;
@@ -408,7 +409,7 @@
     scale: 0.94;
   }
   .shutter:focus-visible {
-    outline: 2px solid var(--gold);
+    outline: 2px solid var(--accent);
     outline-offset: 4px;
   }
   .shutter svg {
@@ -418,13 +419,13 @@
   }
   .ring {
     fill: none;
-    stroke: #fbf4ea;
+    stroke: var(--accent);
     stroke-width: 6;
     stroke-linecap: round;
     stroke-dasharray: 90 10;
   }
   .core {
-    fill: var(--lacquer);
+    fill: var(--accent);
   }
 
   .receipt {
