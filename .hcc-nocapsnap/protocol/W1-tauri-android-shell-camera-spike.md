@@ -123,8 +123,20 @@ How to read it:
   longer filters out front-camera-only devices.
 - **Cleartext HTTP:** allowed only in the debug build type (for the dev server). Release defaults to `false`
   (`app/build.gradle.kts`).
-- **Size:** the debug APK is about 150 MB of content, 143 MB of which is the unoptimized debug Rust library. The
-  release size was not measured (W5).
+- **Size:** the debug APK is about 150 MB of content, 143 MB of which is the unoptimized debug Rust library.
+
+Release APK (`pnpm tauri android build --apk --target aarch64`, then `zipalign -P 16` and `apksigner` with the
+**debug** keystore, for side-loading only; Play upload signing is W5):
+
+```
+capsnap-w1-arm64-release-debugsigned.apk   9,648,726 bytes
+sha256 c9a2e9a13f661ac83b0aa41610e30d1df6fd0dacb09822f5112dd13225223f64
+minSdkVersion:'24'  targetSdkVersion:'37'  native-code: 'arm64-v8a'
+uses-permission: INTERNET, CAMERA (+ AndroidX signature-level receiver permission)
+zipalign -c -P 16 -v 4 → Verification successful
+usesCleartextTraffic=false   (not debuggable)
+libcapsnap_app_lib.so 7,897,224 bytes, LOAD 0x4000
+```
 
 Store tests (`spikes/w0-sqlite-android/scripts/test-host.sh`):
 
@@ -176,7 +188,8 @@ home figures: 2 / 1 / 1        page errors: none
 ## Device checklist (owner, about 10 minutes, Android 16 phone with USB debugging)
 
 ```bash
-adb install -r nocapsnap/app/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+adb install -r capsnap-w1-arm64-release-debugsigned.apk   # the 9.6 MB APK sent with this gate report
+# or build it yourself: ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… nocapsnap/app/scripts/build-android.sh
 ```
 
 1. Open CapSnap. The masthead and tab bar should not sit under the status bar or navigation bar.
