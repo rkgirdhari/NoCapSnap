@@ -3,6 +3,12 @@
 //!
 //! A minimal local-first outbox: captures are committed to SQLite as
 //! `pending`, and flip to `synced` only after the server acknowledges them.
+//! W1 adds [`LocalStore::ingest`], which stores the photo bytes next to the
+//! database and queues the capture in one call.
+
+mod ingest;
+
+pub use ingest::{IngestError, MAX_MEDIA_BYTES, media_path, sniff_mime};
 
 use std::ffi::{CStr, c_char};
 use std::path::Path;
@@ -22,6 +28,8 @@ pub struct Capture {
     pub capture_time_utc: String,
     pub sync_state: String,
     pub synced_at_utc: Option<String>,
+    pub media_mime: Option<String>,
+    pub media_bytes: Option<i64>,
 }
 
 pub struct NewCapture<'a> {
@@ -29,6 +37,14 @@ pub struct NewCapture<'a> {
     pub staff_id: &'a str,
     pub media_sha256: &'a str,
     pub capture_time_utc: &'a str,
+    pub media_mime: Option<&'a str>,
+    pub media_bytes: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Counts {
+    pub pending: i64,
+    pub synced: i64,
 }
 
 pub struct LocalStore {
@@ -61,14 +77,17 @@ impl LocalStore {
     /// unchanged instead of creating a duplicate.
     pub async fn enqueue(&self, new: &NewCapture<'_>) -> Result<Capture, sqlx::Error> {
         sqlx::query(
-            "INSERT INTO captures (client_id, staff_id, media_sha256, capture_time_utc)
-             VALUES (?, ?, ?, ?)
+            "INSERT INTO captures
+                 (client_id, staff_id, media_sha256, capture_time_utc, media_mime, media_bytes)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT (client_id) DO NOTHING",
         )
         .bind(new.client_id)
         .bind(new.staff_id)
         .bind(new.media_sha256)
         .bind(new.capture_time_utc)
+        .bind(new.media_mime)
+        .bind(new.media_bytes)
         .execute(&self.pool)
         .await?;
         self.get(new.client_id)
@@ -78,7 +97,8 @@ impl LocalStore {
 
     pub async fn get(&self, client_id: &str) -> Result<Option<Capture>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc
+            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
+                    media_mime, media_bytes
              FROM captures WHERE client_id = ?",
         )
         .bind(client_id)
@@ -89,11 +109,35 @@ impl LocalStore {
     /// Captures still waiting for a server acknowledgement ("saved offline / QR not ready").
     pub async fn pending(&self) -> Result<Vec<Capture>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc
+            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
+                    media_mime, media_bytes
              FROM captures WHERE sync_state = 'pending' ORDER BY capture_time_utc, id",
         )
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// Newest first, for the History screen.
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<Capture>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT client_id, staff_id, media_sha256, capture_time_utc, sync_state, synced_at_utc,
+                    media_mime, media_bytes
+             FROM captures ORDER BY capture_time_utc DESC, id DESC LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    pub async fn counts(&self) -> Result<Counts, sqlx::Error> {
+        let (pending, synced): (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*) FILTER (WHERE sync_state = 'pending'),
+                    COUNT(*) FILTER (WHERE sync_state = 'synced')
+             FROM captures",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(Counts { pending, synced })
     }
 
     /// Records the server acknowledgement. Returns false if the capture was
@@ -153,6 +197,8 @@ pub async fn selftest(path: &Path) -> Result<String, String> {
         staff_id: "staff-1",
         media_sha256: &digest,
         capture_time_utc: "2026-09-30T12:00:00Z",
+        media_mime: None,
+        media_bytes: None,
     };
     let store = LocalStore::open(path)
         .await

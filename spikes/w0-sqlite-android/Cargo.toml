@@ -18,9 +18,14 @@ crate-type = ["lib", "cdylib"]
 # (the NDK clang on Android) — the thing this spike has to prove.
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "migrate", "macros"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+# W1: capture ingest (digest, id, timestamp).
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [dev-dependencies]
 tempfile = "3"
+tokio = { version = "1", features = ["time"] }
 
 [profile.release]
 strip = "debuginfo"

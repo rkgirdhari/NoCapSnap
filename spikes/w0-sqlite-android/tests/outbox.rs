@@ -12,6 +12,8 @@ fn capture<'a>(client_id: &'a str, sha: &'a str, at: &'a str) -> NewCapture<'a> 
         staff_id: "staff-1",
         media_sha256: sha,
         capture_time_utc: at,
+        media_mime: None,
+        media_bytes: None,
     }
 }
 

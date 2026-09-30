@@ -1,0 +1,3 @@
+# Standalone: keeps this app out of the repo-root pnpm workspace.
+packages:
+  - "."

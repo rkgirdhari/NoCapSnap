@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "default",
+  "description": "Main window: core IPC only. No filesystem, shell, HTTP or other plugins (Spec §6).",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
