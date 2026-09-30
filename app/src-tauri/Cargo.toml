@@ -21,5 +21,6 @@ tauri-build = { version = "2.7", features = [] }
 [dependencies]
 tauri = { version = "2.12", features = [] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 capsnap-store = { path = "../../crates/capsnap-store" }

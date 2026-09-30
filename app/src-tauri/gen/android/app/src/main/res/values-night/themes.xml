@@ -1,10 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Theme.capsnap_app" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Paint the brand base before the WebView loads, so launch never flashes white. -->
-        <item name="android:windowBackground">@color/capsnap_dark_purple</item>
-        <item name="android:statusBarColor">@color/capsnap_dark_purple</item>
-        <item name="android:navigationBarColor">@color/capsnap_dark_purple</item>
+        <!-- Paint the app background before the WebView loads, so launch never flashes white.
+             Targeting API 35+ draws edge to edge, so the bar colours below apply only on older Android. -->
+        <item name="android:windowBackground">@color/capsnap_night</item>
+        <item name="android:statusBarColor">@color/capsnap_night</item>
+        <item name="android:navigationBarColor">@color/capsnap_night</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="colorPrimary">@color/capsnap_gold</item>
     </style>

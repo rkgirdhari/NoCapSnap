@@ -1,85 +1,128 @@
 <script lang="ts">
-  import { onDestroy, tick } from "svelte";
-  import { bridge, type CaptureRecord } from "$lib/bridge";
+  import { onDestroy, onMount, tick } from "svelte";
+  import { goto, pushState, replaceState } from "$app/navigation";
+  import { page } from "$app/state";
+  import { bridge, type MenuItem, type Profile } from "$lib/bridge";
   import Icon from "$lib/components/Icon.svelte";
-  import Stamp from "$lib/components/Stamp.svelte";
-  import StatusPill from "$lib/components/StatusPill.svelte";
-  import { formatBytes, formatTime, shortDigest } from "$lib/format";
+  import Thumb from "$lib/components/Thumb.svelte";
+  import TopBar from "$lib/components/TopBar.svelte";
+  import { TABLE_LABEL_MAX, searchKey, tableLabelError } from "$lib/format";
+  import { cameraRoute, setCameraRoute, type CameraRoute } from "$lib/prefs";
 
-  // W1 compares both Android camera routes on a real device (see the W1 gate report):
-  // "viewfinder" = WebView getUserMedia, "phone" = the system camera app via a file input.
-  type Mode = "viewfinder" | "phone";
-  type Phase = "idle" | "live" | "review" | "saving" | "saved";
+  // Steps: prepare (01/03) → camera → review (02/03) → /invite (03/03).
+  // Camera and review are shallow-routed so Android's back button walks them.
+  const step = $derived(page.state.step ?? "prepare");
 
-  let mode = $state<Mode>("viewfinder");
-  let phase = $state<Phase>("idle");
-  let error = $state<string | null>(null);
-  let photo = $state<{ bytes: Uint8Array; url: string } | null>(null);
-  let saved = $state<CaptureRecord | null>(null);
+  // ---------- 01 / 03 Prepare ----------
+  let profile = $state<Profile | null>(null);
+  let menu = $state<MenuItem[]>([]);
+  let lastPhoto = $state<Record<string, string>>({}); // menu item → latest capture digest
+  let query = $state("");
+  let category = $state("All");
+  let selectedId = $state<string | null>(null);
+  let tableLabel = $state("");
+  let loadError = $state<string | null>(null);
+
+  const categories = $derived(["All", ...new Set(menu.map((m) => m.category))]);
+  const visible = $derived.by(() => {
+    const q = searchKey(query);
+    return menu.filter(
+      (m) => (category === "All" || m.category === category) && (!q || searchKey(m.name).includes(q)),
+    );
+  });
+  const selected = $derived(menu.find((m) => m.id === selectedId) ?? null);
+  const labelError = $derived(tableLabelError(tableLabel));
+  const cleanLabel = $derived(tableLabel.trim() || null);
+  const menuIsDemo = $derived(menu.length > 0 && menu.every((m) => m.source === "demo"));
+  const canContinue = $derived((menu.length === 0 || selected !== null) && !labelError);
+
+  onMount(async () => {
+    // Steps don't survive a reload or a return from another screen: start over.
+    if (page.state.step) replaceState("", {});
+    try {
+      const [p, items, recent] = await Promise.all([bridge.profile(), bridge.menu(), bridge.list(200)]);
+      profile = p;
+      menu = items;
+      const latest: Record<string, string> = {};
+      for (const c of recent) if (c.menuItemId && !latest[c.menuItemId]) latest[c.menuItemId] = c.sha256;
+      lastPhoto = latest;
+    } catch (e) {
+      loadError = message(e);
+    }
+  });
+
+  function continueToCamera() {
+    if (!canContinue) return;
+    pushState("", { step: "camera" });
+    // Still inside the tap, so the permission prompt belongs to it (Spec §3: ask at the moment of use).
+    if (route === "viewfinder" && inAppCamera) startCamera();
+  }
+
+  // ---------- Camera ----------
+  // Two routes, as compared in W1: the WebView viewfinder (getUserMedia) or the
+  // phone's own camera app through a file input.
+  let route = $state<CameraRoute>(cameraRoute());
+  let live = $state(false);
+  let cameraError = $state<string | null>(null);
   let video = $state<HTMLVideoElement>();
   let stream: MediaStream | null = null;
-
+  // Bumped by every start and stop, so a camera that finishes starting after
+  // the user has moved on (switched route, went back) is shut straight away.
+  let startToken = 0;
   const inAppCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
 
   function stopStream() {
-    stream?.getTracks().forEach((track) => track.stop());
+    startToken++;
+    stream?.getTracks().forEach((t) => t.stop());
     stream = null;
-  }
-
-  function clearPhoto() {
-    if (photo) URL.revokeObjectURL(photo.url);
-    photo = null;
+    live = false;
   }
 
   function describeCameraError(e: unknown): string {
     const name = e instanceof DOMException ? e.name : "";
     if (name === "NotAllowedError")
-      return "Camera permission was declined. Allow it in Android settings, or switch to Phone camera.";
+      return "Camera permission was declined. Allow it in Android settings, or use the phone camera app.";
     if (name === "NotFoundError") return "No camera was found on this device.";
     if (name === "NotReadableError") return "The camera is busy in another app. Close it and try again.";
-    return e instanceof Error ? e.message : String(e);
+    return message(e);
   }
 
-  // Camera access is requested only here, at the moment of use (Spec §3).
   async function startCamera() {
-    error = null;
+    cameraError = null;
+    const token = ++startToken;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
+      const started = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 2048 }, height: { ideal: 1536 } },
         audio: false,
       });
-      phase = "live";
+      if (token !== startToken || route !== "viewfinder" || page.state.step !== "camera") {
+        started.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream = started;
+      live = true;
       await tick();
       if (video) {
         video.srcObject = stream;
         await video.play();
       }
     } catch (e) {
+      if (token !== startToken) return;
       stopStream();
-      phase = "idle";
-      error = describeCameraError(e);
+      cameraError = describeCameraError(e);
     }
   }
 
   async function takeFrame() {
-    if (!video || !video.videoWidth) return;
+    if (!video?.videoWidth) return;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d")?.drawImage(video, 0, 0);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
     stopStream();
     if (blob) await usePhoto(blob);
-    else {
-      phase = "idle";
-      error = "The camera frame could not be captured. Try again.";
-    }
-  }
-
-  async function usePhoto(blob: Blob) {
-    clearPhoto();
-    photo = { bytes: new Uint8Array(await blob.arrayBuffer()), url: URL.createObjectURL(blob) };
-    phase = "review";
+    else cameraError = "The camera frame could not be captured. Try again.";
   }
 
   function onPicked(event: Event) {
@@ -89,45 +132,67 @@
     if (file) usePhoto(file);
   }
 
-  async function save() {
-    if (!photo) return;
-    phase = "saving";
-    error = null;
-    try {
-      saved = await bridge.ingest(photo.bytes);
-      phase = "saved";
-    } catch (e) {
-      phase = "review";
-      error = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  function again() {
-    clearPhoto();
-    saved = null;
-    error = null;
-    phase = "idle";
-    if (mode === "viewfinder" && inAppCamera) startCamera();
-  }
-
-  function switchMode(next: Mode) {
-    if (next === mode) return;
+  function switchRoute() {
     stopStream();
-    clearPhoto();
-    saved = null;
-    error = null;
-    phase = "idle";
-    mode = next;
+    cameraError = null;
+    route = route === "viewfinder" ? "phone" : "viewfinder";
+    setCameraRoute(route);
   }
 
-  // Never leave the camera running behind the app's back.
-  function onVisibility() {
-    if (document.hidden && phase === "live") {
-      stopStream();
-      phase = "idle";
+  // ---------- 02 / 03 Review ----------
+  // The unprocessed photo stays in memory only; Rust processes it on save.
+  let photo = $state<{ bytes: Uint8Array; url: string } | null>(null);
+  let saving = $state(false);
+  let saveError = $state<string | null>(null);
+
+  function clearPhoto() {
+    if (photo) URL.revokeObjectURL(photo.url);
+    photo = null;
+  }
+
+  async function usePhoto(blob: Blob) {
+    clearPhoto();
+    saveError = null;
+    photo = { bytes: new Uint8Array(await blob.arrayBuffer()), url: URL.createObjectURL(blob) };
+    pushState("", { step: "review" });
+  }
+
+  // Set by Retake; the camera starts once the back navigation has landed on the camera step.
+  let restartCamera = false;
+
+  function retake() {
+    restartCamera = route === "viewfinder" && inAppCamera;
+    history.back(); // to the camera step, which clears the photo
+  }
+
+  async function save() {
+    if (!photo || saving) return;
+    saving = true;
+    saveError = null;
+    try {
+      const capture = await bridge.ingest(photo.bytes, { menuItemId: selectedId, tableLabel: cleanLabel });
+      clearPhoto();
+      await goto(`/invite?c=${encodeURIComponent(capture.clientId)}&from=capture`, { replaceState: true });
+    } catch (e) {
+      saveError = message(e);
+    } finally {
+      saving = false;
     }
   }
 
+  // ---------- Step bookkeeping ----------
+  $effect(() => {
+    if (step !== "camera" && live) stopStream(); // never leave the camera running off-screen
+    if (step === "camera" && photo) clearPhoto(); // back from review = retake
+    if (step === "camera" && restartCamera) {
+      restartCamera = false;
+      startCamera();
+    }
+  });
+
+  function onVisibility() {
+    if (document.hidden && live) stopStream();
+  }
   $effect(() => {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
@@ -137,175 +202,336 @@
     stopStream();
     clearPhoto();
   });
+
+  const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+  const context = $derived(
+    [profile?.locationName, cleanLabel ? `Table ${cleanLabel}` : null].filter((p): p is string => !!p),
+  );
 </script>
 
-{#if phase === "idle"}
-  <p class="kicker">New capture</p>
-  <h1 class="display">Frame the plate.</h1>
-  <p class="lede">Straight on or three-quarter — the way the guest will first see it.</p>
-
-  <div class="segment" role="tablist" aria-label="Camera">
-    <button role="tab" aria-selected={mode === "viewfinder"} onclick={() => switchMode("viewfinder")}>
-      In-app viewfinder
-    </button>
-    <button role="tab" aria-selected={mode === "phone"} onclick={() => switchMode("phone")}>
-      Phone camera
-    </button>
-  </div>
-{:else}
-  <!-- Once the camera is up, the photo gets the screen. -->
-  <p class="kicker">
-    New capture · {mode === "viewfinder" ? "In-app viewfinder" : "Phone camera"}
-  </p>
-{/if}
-
-<div class="frame phase-{phase}">
-  {#if photo}
-    <img src={photo.url} alt="The plate you just photographed" />
-    {#if phase === "saved"}
-      <div class="stamp-at"><Stamp /></div>
+{#if step === "prepare"}
+  <TopBar back="/" />
+  <main class="page prepare">
+    <p class="kicker">01 / 03 <span class="sep">·</span> Prepare</p>
+    <h1 class="display">Which dish?</h1>
+    {#if profile?.locationName}
+      <p class="sub">{profile.locationName} · {menuIsDemo ? "Demo menu" : "Menu"}</p>
     {/if}
-  {:else if phase === "live"}
-    <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={video} playsinline muted></video>
-    <div class="scrim" aria-hidden="true"></div>
-    <button class="shutter" onclick={takeFrame} aria-label="Take photo">
-      <svg viewBox="0 0 100 100" aria-hidden="true">
-        <circle class="ring" cx="50" cy="50" r="41" pathLength="100" />
-        <circle class="core" cx="50" cy="50" r="22" />
-      </svg>
-    </button>
-  {:else}
-    <div class="empty">
-      <!-- A plate seen from above: where the dish goes. -->
-      <svg class="guide" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r="42" />
-        <circle cx="50" cy="50" r="31" />
-      </svg>
-      {#if mode === "viewfinder"}
-        <p>CapSnap asks for the camera only now, while you're plating.</p>
-        <button class="btn primary" onclick={startCamera} disabled={!inAppCamera}>
-          <Icon name="camera" /> Start camera
-        </button>
-        {#if !inAppCamera}
-          <p class="muted small">This screen has no in-app camera. Use Phone camera instead.</p>
-        {/if}
-      {:else}
-        <p>Opens your phone's own camera app, then brings the photo back here.</p>
-        <label class="btn primary picker">
-          <Icon name="camera" /> Open camera app
-          <input class="visually-hidden" type="file" accept="image/*" capture="environment" onchange={onPicked} />
+
+    <label class="search">
+      <Icon name="search" size={24} stroke={1.5} />
+      <span class="visually-hidden">Search the menu</span>
+      <input type="search" placeholder="Search the menu" bind:value={query} autocomplete="off" />
+    </label>
+
+    {#if categories.length > 2}
+      <div class="chips" role="group" aria-label="Course">
+        {#each categories as c (c)}
+          <button class="chip" aria-pressed={category === c} onclick={() => (category = c)}>{c}</button>
+        {/each}
+      </div>
+    {/if}
+
+    {#if loadError}
+      <p class="error" role="alert">{loadError}</p>
+    {/if}
+
+    <fieldset class="dishes">
+      <legend class="visually-hidden">Dish</legend>
+      {#each visible as item (item.id)}
+        <label class="dish" class:on={selectedId === item.id}>
+          <input class="visually-hidden" type="radio" name="dish" value={item.id} bind:group={selectedId} />
+          <span class="pic"><Thumb sha256={lastPhoto[item.id]} alt="" /></span>
+          <span class="dish-name">{item.name}</span>
+          <span class="radio" aria-hidden="true">
+            {#if selectedId === item.id}<Icon name="check" size={20} stroke={2.4} />{/if}
+          </span>
         </label>
-      {/if}
-    </div>
-  {/if}
-  <span class="corner tl" aria-hidden="true"></span>
-  <span class="corner tr" aria-hidden="true"></span>
-  <span class="corner bl" aria-hidden="true"></span>
-  <span class="corner br" aria-hidden="true"></span>
-</div>
+      {:else}
+        {#if menu.length}
+          <p class="helper">No dish matches “{query.trim()}”.</p>
+        {:else if !loadError}
+          <p class="helper">No menu on this device yet. You can still capture the plate.</p>
+        {/if}
+      {/each}
+    </fieldset>
 
-{#if error}
-  <p class="error" role="alert">{error}</p>
-{/if}
+    <label class="field">
+      <span class="field-label">Table label (optional)</span>
+      <input
+        type="text"
+        placeholder="e.g. 12B"
+        maxlength={TABLE_LABEL_MAX}
+        autocomplete="off"
+        autocapitalize="characters"
+        bind:value={tableLabel}
+        aria-invalid={labelError ? "true" : undefined}
+        aria-describedby="table-help"
+      />
+      <span id="table-help" class="helper" class:bad={labelError}>
+        {labelError ?? "For staff reference only · stays on this device"}
+      </span>
+    </label>
 
-<div class="actions">
-  {#if phase === "live"}
-    <button class="btn quiet" onclick={() => switchMode(mode === "viewfinder" ? "phone" : "viewfinder")}>
-      Use the phone camera instead
-    </button>
-  {:else if phase === "review" || phase === "saving"}
-    <div class="pair">
-      <button class="btn quiet" onclick={again} disabled={phase === "saving"}>Retake</button>
-      <button class="btn primary" onclick={save} disabled={phase === "saving"}>
-        {phase === "saving" ? "Saving…" : "Save plate"}
+    <div class="dock">
+      <button class="btn primary block tall" onclick={continueToCamera} disabled={!canContinue}>
+        <Icon name="camera" size={28} stroke={1.7} /> Continue to camera
       </button>
     </div>
-  {:else if phase === "saved" && saved}
-    <div class="receipt">
-      <StatusPill state={saved.syncState} />
-      <p class="mono muted">
-        #{shortDigest(saved.sha256)} · {formatBytes(saved.bytes)} · {formatTime(saved.capturedAt)}
-      </p>
+  </main>
+{:else if step === "camera"}
+  <TopBar back={() => history.back()} />
+  <main class="page camera">
+    <p class="kicker">{selected?.name ?? "New capture"}{#if cleanLabel}&ensp;·&ensp;Table {cleanLabel}{/if}</p>
+
+    <div class="frame">
+      {#if live}
+        <!-- svelte-ignore a11y_media_has_caption -->
+        <video bind:this={video} playsinline muted></video>
+        <button class="shutter" onclick={takeFrame} aria-label="Take photo"><span></span></button>
+      {:else}
+        <div class="empty">
+          <svg class="guide" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="42" /><circle cx="50" cy="50" r="30" />
+          </svg>
+          {#if route === "viewfinder"}
+            <p>CapSnap uses the camera only while you frame the plate.</p>
+            <button class="btn primary" onclick={startCamera} disabled={!inAppCamera}>
+              <Icon name="camera" /> Start camera
+            </button>
+            {#if !inAppCamera}
+              <p class="helper">No in-app camera here. Use the phone camera app instead.</p>
+            {/if}
+          {:else}
+            <p>Opens your phone's camera app, then brings the photo back here.</p>
+            <label class="btn primary picker">
+              <Icon name="camera" /> Open camera app
+              <input class="visually-hidden" type="file" accept="image/*" capture="environment" onchange={onPicked} />
+            </label>
+          {/if}
+        </div>
+      {/if}
     </div>
-    <button class="btn primary block" onclick={again}>Capture the next plate</button>
-    <a class="btn quiet block" href="/history">See today's plates</a>
-  {/if}
-</div>
+
+    {#if cameraError}
+      <p class="error" role="alert">{cameraError}</p>
+    {/if}
+
+    <button class="switch" onclick={switchRoute}>
+      {route === "viewfinder" ? "Use the phone camera app instead" : "Use the in-app viewfinder instead"}
+    </button>
+  </main>
+{:else if step === "review"}
+  <TopBar back={() => history.back()} />
+  <main class="page review">
+    <p class="kicker center">02 / 03 <span class="sep">·</span> Review</p>
+    <h1 class="display center">The plate, as served.</h1>
+
+    <div class="shot">
+      {#if photo}
+        <!-- Shown whole (not cropped) so nothing at the edges escapes the check. -->
+        <img src={photo.url} alt="The plate you just photographed" />
+      {/if}
+    </div>
+
+    <div class="card what">
+      <p class="what-dish">{selected?.name ?? "Unlabelled dish"}</p>
+      {#if context.length}
+        <p class="caps what-where">
+          {#each context as part, i (part)}{#if i}<span class="dot">·</span>{/if}<span class="nowrap">{part}</span>{/each}
+        </p>
+      {/if}
+    </div>
+
+    <p class="hint"><Icon name="info" size={22} stroke={1.4} /> Check the dish. Keep diners and receipts out of frame.</p>
+
+    {#if saveError}
+      <p class="error" role="alert">{saveError}</p>
+    {/if}
+
+    <div class="pair">
+      <button class="btn outline tall" onclick={retake} disabled={saving}>
+        <Icon name="sync" size={22} stroke={1.6} /> Retake
+      </button>
+      <button class="btn primary tall" onclick={save} disabled={saving || !photo}>
+        <Icon name="save" size={22} stroke={1.7} />
+        {saving ? "Saving…" : "Save this capture"}
+      </button>
+    </div>
+    <p class="helper center">Saved on this device first.</p>
+  </main>
+{/if}
 
 <style>
-  .segment {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    margin: 24px 0 16px;
-    padding: 4px;
-    border-radius: 12px;
-    background: var(--bg-deep);
-    border: 1px solid var(--line);
+  .sep {
+    margin: 0 0.6em;
+  }
+  .center {
+    text-align: center;
   }
 
-  .segment button {
-    min-height: 44px;
+  /* ---- Prepare ---- */
+  .prepare .display {
+    margin-top: 6px;
+  }
+  .sub {
+    margin: 6px 0 0;
+    font-size: 15.5px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 0 14px;
+    min-height: var(--tap);
+    border-radius: var(--radius);
+    background: var(--input);
+    border: 1px solid var(--edge);
+    color: var(--on-input);
+  }
+  .search input {
+    flex: 1;
+    min-width: 0;
     border: 0;
-    border-radius: 9px;
-    background: transparent;
-    color: var(--text-muted);
-    font: 600 14.5px/1 var(--sans);
+    background: none;
+    outline: none;
+    font-size: 16px;
+    letter-spacing: 0.03em;
+    color: var(--text);
+  }
+  .search:focus-within {
+    outline: 2px solid var(--select);
+    outline-offset: 2px;
+  }
+  input::placeholder {
+    color: var(--on-input);
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    overflow-x: auto;
+  }
+  .chip {
+    flex: none;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1.5px solid transparent;
+    background: var(--card);
+    color: var(--text);
+    font-size: 15px;
+    letter-spacing: 0.02em;
     cursor: pointer;
   }
-
-  .segment button[aria-selected="true"] {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 1px 0 rgba(246, 224, 94, 0.18) inset;
+  .chip[aria-pressed="true"] {
+    border-color: var(--select);
+    background: var(--wait-bg);
   }
 
+  .dishes {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding: 0;
+    border: 0;
+  }
+  .dish {
+    display: grid;
+    grid-template-columns: 76px 1fr 32px;
+    align-items: center;
+    gap: 14px;
+    padding: 7px 14px 7px 7px;
+    border-radius: var(--radius);
+    background: var(--card);
+    border: 1.5px solid var(--hairline);
+    cursor: pointer;
+  }
+  .dish.on {
+    border-color: var(--select);
+  }
+  .dish:focus-within {
+    outline: 2px solid var(--select);
+    outline-offset: 2px;
+  }
+  .dish .pic {
+    height: 58px;
+  }
+  .dish-name {
+    font-family: var(--serif);
+    font-size: 16.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--headline);
+  }
+  .radio {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--muted);
+    color: var(--on-cta);
+  }
+  .on .radio {
+    border-color: var(--select);
+    background: var(--select);
+  }
+
+  .field {
+    display: grid;
+    gap: 8px;
+    margin-top: 22px;
+  }
+  .field-label {
+    font-size: 16px;
+    letter-spacing: 0.02em;
+  }
+  .field input {
+    min-height: var(--tap);
+    padding: 0 16px;
+    border-radius: var(--radius);
+    background: var(--input);
+    border: 1px solid var(--edge);
+    font-size: 17px;
+    letter-spacing: 0.06em;
+  }
+  .field .bad {
+    color: var(--danger);
+  }
+
+  /* The next step stays reachable above the tab bar however long the menu is. */
+  .dock {
+    position: sticky;
+    bottom: calc(var(--tabbar) + var(--safe-bottom) + 10px);
+    margin-top: 18px;
+    padding-top: 12px;
+    background: linear-gradient(transparent, var(--bg) 40%);
+  }
+
+  /* ---- Camera ---- */
   .frame {
     position: relative;
-    aspect-ratio: 4 / 5;
+    margin-top: 14px;
+    aspect-ratio: 3 / 4;
+    max-height: calc(100dvh - 230px);
+    width: 100%;
     overflow: hidden;
-    border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
-    border: 1px solid var(--surface-edge);
+    border-radius: var(--radius-lg);
+    background: radial-gradient(circle at 50% 40%, #2c1c29, #140a19 75%);
+    border: 1px solid var(--hairline);
   }
-
-  /* Keep the next action above the tab bar on a phone screen. */
-  .frame.phase-live {
-    max-height: calc(100dvh - 250px);
-  }
-  .frame.phase-review,
-  .frame.phase-saving {
-    max-height: calc(100dvh - 330px);
-  }
-  .frame.phase-saved {
-    max-height: calc(100dvh - 440px);
-  }
-
-  .frame img,
   .frame video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
   }
-
-  /* Gold corner ticks, like the marks on a framing card. */
-  .corner {
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    border-color: var(--accent);
-    border-style: solid;
-    border-width: 0;
-    opacity: 0.9;
-    pointer-events: none;
-  }
-  .tl { top: 12px; left: 12px; border-top-width: 2px; border-left-width: 2px; }
-  .tr { top: 12px; right: 12px; border-top-width: 2px; border-right-width: 2px; }
-  .bl { bottom: 12px; left: 12px; border-bottom-width: 2px; border-left-width: 2px; }
-  .br { bottom: 12px; right: 12px; border-bottom-width: 2px; border-right-width: 2px; }
-
   .empty {
     position: absolute;
     inset: 0;
@@ -314,127 +540,136 @@
     align-items: center;
     justify-content: center;
     gap: 16px;
-    padding: 32px;
+    padding: 28px;
     text-align: center;
-    color: var(--text-soft);
+    color: var(--secondary);
   }
-
   .empty p {
     margin: 0;
     max-width: 28ch;
   }
-
-  .small {
-    font-size: 13px;
-  }
-
   .guide {
-    width: 104px;
-    height: 104px;
-  }
-
-  .guide circle {
+    width: 110px;
     fill: none;
-    stroke: var(--accent);
-    stroke-width: 1.6;
+    stroke: var(--select);
+    stroke-width: 1.4;
   }
-
   .guide circle + circle {
-    stroke: var(--text);
+    stroke: var(--muted);
     stroke-width: 1;
-    opacity: 0.3;
   }
-
-  .scrim {
-    position: absolute;
-    inset: auto 0 0 0;
-    height: 150px;
-    background: linear-gradient(transparent, rgba(12, 9, 7, 0.55));
-    pointer-events: none;
-  }
-
   .picker:focus-within {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--select);
     outline-offset: 3px;
   }
-
-  .stamp-at {
-    position: absolute;
-    right: 22px;
-    bottom: 26px;
-  }
-
-  .error {
-    margin: 14px 0 0;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: var(--danger-tint);
-    color: var(--danger);
-    font-size: 14.5px;
-    font-weight: 600;
-  }
-
-  .actions {
-    display: grid;
-    gap: 12px;
-    justify-items: center;
-    margin-top: 22px;
-  }
-
-  .pair {
-    display: grid;
-    grid-template-columns: 1fr 1.4fr;
-    gap: 12px;
-    width: 100%;
-  }
-
-  /* The shutter is an ensō: one confident gold stroke around a gold centre,
-     floating over the viewfinder like a camera app's. */
   .shutter {
     position: absolute;
     left: 50%;
     bottom: 22px;
     translate: -50% 0;
-    z-index: 1;
-    width: 88px;
-    height: 88px;
+    display: grid;
+    place-items: center;
+    width: 84px;
+    height: 84px;
     padding: 0;
-    border: 0;
     border-radius: 50%;
-    background: transparent;
+    border: 4px solid var(--headline);
+    background: rgba(0, 0, 0, 0.18);
     cursor: pointer;
-    transition: transform 90ms ease;
   }
-  .shutter:active {
-    scale: 0.94;
+  .shutter span {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--cta);
+    transition: scale 90ms ease;
   }
-  .shutter:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 4px;
+  .shutter:active span {
+    scale: 0.9;
   }
-  .shutter svg {
-    width: 100%;
-    height: 100%;
-    transform: rotate(-60deg);
-  }
-  .ring {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 6;
-    stroke-linecap: round;
-    stroke-dasharray: 90 10;
-  }
-  .core {
-    fill: var(--accent);
+  .switch {
+    display: block;
+    margin: 16px auto 0;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font-size: 15px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
   }
 
-  .receipt {
-    display: grid;
-    justify-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
+  /* ---- Review ---- */
+  .review .display {
+    margin-top: 10px;
+    font-size: clamp(30px, 9.2vw, 40px);
   }
-  .receipt p {
+  .shot {
+    display: grid;
+    place-items: center;
+    margin-top: 18px;
+    min-height: 200px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #0f0714;
+    border: 1px solid var(--hairline);
+  }
+  .shot img {
+    width: 100%;
+    max-height: 40dvh;
+    object-fit: contain;
+  }
+  .what {
+    margin-top: 14px;
+    padding: 16px 18px;
+  }
+  .what p {
     margin: 0;
+  }
+  .what-dish {
+    font-family: var(--serif);
+    font-size: 23px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--headline);
+  }
+  .what-where {
+    margin-top: 8px !important;
+    color: var(--muted);
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
+  .what-where .dot {
+    margin: 0 0.8em;
+  }
+  .hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 4px;
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+  .hint :global(svg) {
+    flex: none;
+    color: var(--muted);
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+  }
+  .pair .btn {
+    padding: 0 16px;
+    gap: 8px;
+    font-size: 15.5px;
+    white-space: nowrap;
+  }
+  .review .helper {
+    margin: 14px 0 0;
   }
 </style>

@@ -30,6 +30,8 @@ pub enum IngestError {
     Undecodable(PhotoError),
     UnknownDish,
     InvalidTableLabel,
+    /// The photo arrived as text that is not valid base64.
+    BadEncoding,
     Io(std::io::Error),
     Db(sqlx::Error),
 }
@@ -46,6 +48,7 @@ impl fmt::Display for IngestError {
             }
             IngestError::Undecodable(e) => write!(f, "the photo could not be read: {e}"),
             IngestError::UnknownDish => write!(f, "that dish is not on this menu"),
+            IngestError::BadEncoding => write!(f, "the photo did not arrive intact; try again"),
             IngestError::InvalidTableLabel => write!(
                 f,
                 "a table label is up to {MAX_TABLE_LABEL_CHARS} letters, numbers or spaces"
@@ -57,6 +60,22 @@ impl fmt::Display for IngestError {
 }
 
 impl std::error::Error for IngestError {}
+
+/// Decodes a photo sent as base64 text. On Android, Tauri carries IPC over
+/// `postMessage` as a string because the WebView cannot hand a request body to
+/// the app, so the UI base64-encodes the bytes there (a plain byte array would
+/// arrive as a JSON list of numbers, several times larger). The size limit is
+/// checked on the encoded length, before anything is decoded.
+pub fn photo_from_base64(encoded: &str) -> Result<Vec<u8>, IngestError> {
+    use base64::Engine as _;
+    let max_encoded = MAX_MEDIA_BYTES.div_ceil(3) * 4;
+    if encoded.len() > max_encoded {
+        return Err(IngestError::TooLarge(encoded.len() / 4 * 3));
+    }
+    base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| IngestError::BadEncoding)
+}
 
 /// Identifies the image type from its file signature, not from what the
 /// caller claims (Spec §5: validate file signatures).

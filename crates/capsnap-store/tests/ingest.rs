@@ -2,7 +2,7 @@ mod common;
 
 use capsnap_store::{
     CaptureDetails, DEMO_LOCATION_ID, IngestError, LocalStore, MAX_MEDIA_BYTES, media_path,
-    sniff_mime, thumb_path,
+    photo_from_base64, sniff_mime, thumb_path,
 };
 use common::*;
 use sha2::{Digest, Sha256};
@@ -172,6 +172,25 @@ async fn rejects_bad_input_without_side_effects() {
 
     assert_eq!(store.counts().await.unwrap(), Default::default());
     assert!(!media.exists());
+}
+
+#[test]
+fn base64_photos_round_trip_and_are_bounded_before_decoding() {
+    use base64::Engine as _;
+    let photo = jpeg(64, 48);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&photo);
+    assert_eq!(photo_from_base64(&encoded).unwrap(), photo);
+
+    assert!(matches!(
+        photo_from_base64("not base64!"),
+        Err(IngestError::BadEncoding)
+    ));
+    // Over the limit is refused on length alone.
+    let too_long = "A".repeat(MAX_MEDIA_BYTES.div_ceil(3) * 4 + 4);
+    assert!(matches!(
+        photo_from_base64(&too_long),
+        Err(IngestError::TooLarge(_))
+    ));
 }
 
 #[test]

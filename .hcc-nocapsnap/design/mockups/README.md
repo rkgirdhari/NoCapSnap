@@ -1,7 +1,7 @@
 # NO CAP SNAP — owner mockups (design reference)
 
 Received from the owner on 2026-09-30. All five are 1125×2000 WebP files. They are the design target proposed for W2
-([`../../protocol/W2-PROPOSAL-staff-ui-from-mockups.md`](../../protocol/W2-PROPOSAL-staff-ui-from-mockups.md)).
+([`../../protocol/W2-staff-ui-from-mockups.md`](../../protocol/W2-staff-ui-from-mockups.md)).
 
 | File | Screen |
 |---|---|

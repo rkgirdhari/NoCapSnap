@@ -276,6 +276,7 @@ dependencies = [
  "capsnap-store",
  "chrono",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]
@@ -284,6 +285,7 @@ dependencies = [
 name = "capsnap-store"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "image",
  "sha2 0.10.9",

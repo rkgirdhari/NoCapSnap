@@ -1,144 +1,146 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { bridge, type CaptureRecord } from "$lib/bridge";
-  import StatusPill from "$lib/components/StatusPill.svelte";
-  import { dayLabel, formatBytes, formatTime, shortDigest } from "$lib/format";
+  import Icon from "$lib/components/Icon.svelte";
+  import PlateRow from "$lib/components/PlateRow.svelte";
+  import TopBar from "$lib/components/TopBar.svelte";
+  import { dayLabel, whenLabel } from "$lib/format";
 
   let captures = $state<CaptureRecord[]>([]);
   let loaded = $state(false);
+  let error = $state<string | null>(null);
 
+  onMount(async () => {
+    try {
+      captures = await bridge.list(500);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      loaded = true;
+    }
+  });
+
+  const pending = $derived(captures.filter((c) => c.syncState === "pending").length);
+  // The newest server acknowledgement on this device, if any ever happened.
+  const lastSynced = $derived(
+    captures.reduce<string | null>((max, c) => (c.syncedAt && (!max || c.syncedAt > max) ? c.syncedAt : max), null),
+  );
   const groups = $derived.by(() => {
-    const out: { label: string; items: CaptureRecord[] }[] = [];
+    const out: { day: string; items: CaptureRecord[] }[] = [];
     for (const c of captures) {
-      const label = dayLabel(c.capturedAt);
-      const last = out.at(-1);
-      if (last?.label === label) last.items.push(c);
-      else out.push({ label, items: [c] });
+      const day = dayLabel(c.capturedAt);
+      if (out.at(-1)?.day !== day) out.push({ day, items: [] });
+      out.at(-1)!.items.push(c);
     }
     return out;
   });
-
-  $effect(() => {
-    bridge
-      .list()
-      .then((list) => (captures = list))
-      .finally(() => (loaded = true));
-  });
 </script>
 
-<p class="kicker">History</p>
-<h1 class="display">Plates, in order.</h1>
-<p class="lede">Everything captured on this phone, newest first.</p>
+<TopBar status />
 
-{#if loaded && captures.length === 0}
-  <div class="empty card">
-    <svg class="guide" viewBox="0 0 100 100" aria-hidden="true">
-      <circle cx="50" cy="50" r="42" />
-      <circle cx="50" cy="50" r="31" />
-    </svg>
-    <h2>Nothing plated yet.</h2>
-    <p class="muted">The first plate you capture shows up here.</p>
-    <a class="btn primary" href="/capture">Capture a plate</a>
-  </div>
-{:else}
-  {#each groups as group (group.label)}
-    <h2 class="day">{group.label}</h2>
-    <ul class="ledger on-surface">
-      {#each group.items as c (c.clientId)}
-        <li>
-          <span class="time">{formatTime(c.capturedAt)}</span>
-          <span class="state"><StatusPill state={c.syncState} /></span>
-          <span class="mono muted meta">#{shortDigest(c.sha256)} · {formatBytes(c.bytes)}</span>
-        </li>
+<main class="page">
+  <h1 class="display center">Your plates are safe here.</h1>
+
+  {#if pending > 0}
+    <div class="card banner" role="status">
+      <Icon name="database" size={40} stroke={1.3} />
+      <span class="rule" aria-hidden="true"></span>
+      <span>
+        <strong>{pending} saved offline</strong>
+        <span class="muted">Saved on this device. Guest QR not ready.</span>
+      </span>
+    </div>
+  {/if}
+  {#if loaded && captures.length}
+    <p class="last"><span>Last synced</span> <span class="muted">{lastSynced ? whenLabel(lastSynced) : "Never"}</span></p>
+  {/if}
+
+  {#if error}
+    <p class="error" role="alert">{error}</p>
+  {/if}
+
+  {#if loaded && !captures.length && !error}
+    <div class="empty">
+      <p class="muted">No plates yet. Captures are saved on this device first, then sync.</p>
+      <a class="btn primary block tall" href="/capture"><Icon name="camera" size={26} /> Capture a dish</a>
+    </div>
+  {/if}
+
+  {#each groups as group (group.day)}
+    <h2 class="title day">{group.day}</h2>
+    <div class="list">
+      {#each group.items as capture (capture.clientId)}
+        <PlateRow {capture} />
       {/each}
-    </ul>
+    </div>
   {/each}
-{/if}
+
+  {#if pending > 0}
+    <button class="btn gold block tall retry" disabled aria-describedby="retry-why">
+      <Icon name="sync" size={26} stroke={1.6} /> Retry when connected
+    </button>
+    <p id="retry-why" class="helper center">Sync isn't switched on in this build yet.</p>
+  {/if}
+</main>
 
 <style>
-  .day {
-    margin: 30px 0 10px;
-    font-size: 15px;
-    font-family: var(--sans);
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-  }
-
-  .ledger {
-    list-style: none;
-    margin: 0;
-    padding: 0 14px;
-    border: 1px solid var(--surface-edge);
-    border-radius: var(--radius);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
-    box-shadow: var(--shadow);
-  }
-
-  /* Time and status on one line, digest beneath: the status chip keeps its
-     full wording without crowding the card edge on a narrow phone. */
-  li {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      "time state"
-      "meta meta";
-    align-items: center;
-    gap: 6px 12px;
-    padding: 14px 0;
-  }
-
-  li + li {
-    border-top: 1px solid color-mix(in srgb, var(--muted-gold) 70%, transparent);
-  }
-
-  .time {
-    grid-area: time;
-    font-family: var(--serif);
-    font-size: 20px;
-    font-variant-numeric: lining-nums tabular-nums;
-  }
-
-  .state {
-    grid-area: state;
-    justify-self: end;
-  }
-
-  .meta {
-    grid-area: meta;
-  }
-
-  .empty {
-    display: grid;
-    justify-items: center;
-    gap: 10px;
-    margin-top: 28px;
-    padding: 34px 20px;
+  .center {
     text-align: center;
   }
-
-  .empty h2 {
-    font-size: 22px;
+  .display {
+    margin-top: 12px;
+    font-size: clamp(36px, 11vw, 48px);
   }
-
-  .empty p {
-    margin: 0 0 8px;
+  .banner {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 16px;
+    margin-top: 22px;
+    padding: 16px 18px;
+    color: var(--text);
   }
-
-  .guide {
-    width: 80px;
-    height: 80px;
+  .banner strong {
+    display: block;
+    font-size: 19px;
+    font-weight: 550;
   }
-
-  .guide circle {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1.6;
+  .banner .muted {
+    font-size: 15px;
   }
-
-  .guide circle + circle {
-    stroke: var(--text);
-    stroke-width: 1.2;
+  .rule {
+    width: 1px;
+    align-self: stretch;
+    background: var(--hairline);
+  }
+  .last {
+    display: flex;
+    gap: 14px;
+    margin: 12px 4px 0;
+    font-size: 15px;
+    letter-spacing: 0.03em;
+  }
+  .day {
+    margin: 26px 0 12px;
+    font-size: 28px;
+  }
+  .list {
+    display: grid;
+    gap: 10px;
+  }
+  .empty {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+    text-align: center;
+  }
+  .retry {
+    margin-top: 22px;
+  }
+  .retry:disabled {
     opacity: 0.7;
+  }
+  .helper {
+    margin: 10px 0 0;
   }
 </style>

@@ -26,10 +26,32 @@ export function dayLabel(iso: string, now = new Date()): string {
   return day.format(d);
 }
 
-/** "Wednesday · Dinner service" — the way the pass talks about time. */
+/** "Today · 7:24 PM" */
+export const whenLabel = (iso: string, now = new Date()) => `${dayLabel(iso, now)} · ${formatTime(iso)}`;
+
+/** "Tuesday · Dinner service" — the way the pass talks about time. */
 export function serviceLine(now = new Date()): string {
   const h = now.getHours();
   const service =
     h < 11 ? "Morning prep" : h < 16 ? "Lunch service" : h < 22 ? "Dinner service" : "Late service";
   return `${weekday.format(now)} · ${service}`;
+}
+
+export function greeting(now = new Date()): string {
+  const h = now.getHours();
+  return h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+/** Case- and accent-insensitive search key ("Crème" matches "creme"). */
+export const searchKey = (s: string) =>
+  s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+
+/** Mirrors the store's rule (crates/capsnap-store/src/ingest.rs). */
+export const TABLE_LABEL_MAX = 16;
+export function tableLabelError(raw: string): string | null {
+  const label = raw.trim();
+  if (!label) return null;
+  if ([...label].length > TABLE_LABEL_MAX) return `Up to ${TABLE_LABEL_MAX} characters.`;
+  if (!/^[\p{L}\p{N} #/.-]+$/u.test(label)) return "Letters, numbers, spaces and - # / . only.";
+  return null;
 }

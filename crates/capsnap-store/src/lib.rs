@@ -11,8 +11,8 @@ mod menu;
 pub mod photo;
 
 pub use ingest::{
-    CaptureDetails, IngestError, MAX_MEDIA_BYTES, MAX_TABLE_LABEL_CHARS, media_path, sniff_mime,
-    thumb_path,
+    CaptureDetails, IngestError, MAX_MEDIA_BYTES, MAX_TABLE_LABEL_CHARS, media_path,
+    photo_from_base64, sniff_mime, thumb_path,
 };
 pub use menu::{DEMO_LOCATION_ID, DEMO_LOCATION_NAME, MenuItem, MenuSource, NewMenuItem, Setting};
 /// The store's database error, so callers need no direct sqlx dependency.

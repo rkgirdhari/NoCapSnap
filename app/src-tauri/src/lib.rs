@@ -8,8 +8,8 @@
 use std::path::PathBuf;
 
 use capsnap_store::{
-    Capture, CaptureDetails, LocalStore, MenuItem, Pragma, Setting, media_path, selftest,
-    thumb_path,
+    Capture, CaptureDetails, LocalStore, MenuItem, Pragma, Setting, media_path, photo_from_base64,
+    selftest, thumb_path,
 };
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
@@ -102,10 +102,26 @@ struct ProfileDto {
     is_demo: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppInfoDto {
+    version: String,
+    /// Debug Rust core: the UI may offer developer-only tools such as `simulate_ack`.
+    debug: bool,
+}
+
 type CmdResult<T> = Result<T, String>;
 
 fn text(e: impl std::fmt::Display) -> String {
     e.to_string()
+}
+
+#[tauri::command]
+fn app_info(app: tauri::AppHandle) -> AppInfoDto {
+    AppInfoDto {
+        version: app.package_info().version.to_string(),
+        debug: cfg!(debug_assertions),
+    }
 }
 
 #[tauri::command]
@@ -205,11 +221,23 @@ fn percent_decode(input: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
+/// The photo arrives as the raw IPC body where the platform supports one, or
+/// as `{ "photoBase64": … }` on Android, whose WebView cannot pass a request
+/// body to the app (Tauri then carries IPC over `postMessage` as text).
+fn photo_bytes(body: &InvokeBody) -> CmdResult<Vec<u8>> {
+    match body {
+        InvokeBody::Raw(bytes) => Ok(bytes.clone()),
+        InvokeBody::Json(serde_json::Value::Object(fields)) => match fields.get("photoBase64") {
+            Some(serde_json::Value::String(encoded)) => photo_from_base64(encoded).map_err(text),
+            _ => Err("expected photoBase64".into()),
+        },
+        _ => Err("expected the photo as raw bytes or base64".into()),
+    }
+}
+
 #[tauri::command]
 async fn capture_ingest(request: Request<'_>, state: State<'_, AppState>) -> CmdResult<CaptureDto> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("expected the photo as raw bytes".into());
-    };
+    let bytes = photo_bytes(request.body())?;
     let menu_item_id = header(&request, "x-capsnap-menu-item")?;
     let table_label = header(&request, "x-capsnap-table-label")?;
     let details = CaptureDetails {
@@ -218,7 +246,7 @@ async fn capture_ingest(request: Request<'_>, state: State<'_, AppState>) -> Cmd
     };
     state
         .store
-        .ingest(&state.media_dir, LOCAL_STAFF_ID, details, bytes.clone())
+        .ingest(&state.media_dir, LOCAL_STAFF_ID, details, bytes)
         .await
         .map(Into::into)
         .map_err(text)
@@ -313,6 +341,7 @@ async fn simulate_ack(state: State<'_, AppState>) -> CmdResult<Option<CaptureDto
 #[cfg(debug_assertions)]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
+        app_info,
         store_status,
         profile_get,
         profile_set_name,
@@ -329,6 +358,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
 #[cfg(not(debug_assertions))]
 fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
+        app_info,
         store_status,
         profile_get,
         profile_set_name,

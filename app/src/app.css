@@ -1,65 +1,80 @@
 /*
- * CapSnap brand — Royal Purple + Gold + Bamboo (owner direction, W1/D8).
- * Luxury hospitality: fine dining, concierge service, spa-like calm.
+ * NO CAP SNAP — design tokens measured from the owner's mockups (W2, decision M3).
+ * Source and method: .hcc-nocapsnap/design/mockups/README.md.
  *
- * The six brand colours are used exactly as specified. Where a brand
- * colour fails WCAG AA for small text on the surface it sits on, a
- * text-safe step of the same hue is used for that text only (ratios in
- * the W1 gate report):
- *   Muted Gold #B7791F on purple is 4.18:1 → small text uses #C18A39 (5.05:1)
- *   Muted Gold on Bamboo Brown is 2.28:1  → card labels use #E6CA95 (5.24:1)
- * System fonts only — the spec forbids external font loading (§6).
+ * Contrast (WCAG 2.x, all text pairs ≥ 4.5:1) — checked per surface, and a
+ * colour is only used where it passes:
+ *   --text      #F4E8DA  15.7 bg · 13.6 card · 8.6 stat card
+ *   --muted     #98827C   5.3 bg · 4.5 card · 5.0 list card
+ *   --secondary #A1949B   6.5 bg · 5.6 card · 6.2 list card (not on inputs: 4.47)
+ *   --helper    #8A7D86   4.8 bg · 4.6 list card (never on --card: 4.17)
+ *   --on-input  #B3A6AD   5.6 on --input (placeholders)
+ *   --stat-label #D0BDB7  5.7 on --stat
+ *   --edge      #7A625E   3.4:1 against bg — the visible boundary of inputs and stat cards
+ * System fonts only: the spec forbids external fonts (§6); M4 default keeps the device serif.
  */
 :root {
-  /* Brand */
-  --royal-purple: #2d1b4e;
-  --dark-purple: #1a1a2e;
-  --bamboo-brown: #744210;
-  --gold: #f6e05e;
-  --bamboo-green: #68d391;
-  --muted-gold: #b7791f;
+  --bg: #190926;
+  --bg-bar: #150720;
+  --card: #2a1b27; /* dish card, review card, banner */
+  --list: #1e1223; /* list rows, recent plates */
+  --stat: #533a39; /* stat cards, location pill */
+  --input: #402c2e;
+  --edge: #7a625e;
+  --hairline: rgba(252, 233, 197, 0.09);
 
-  /* Roles */
-  --bg: var(--royal-purple);
-  --bg-deep: #22143c; /* sunken areas: segmented control, notes */
-  --surface: var(--bamboo-brown); /* cards: a lacquered bamboo tray */
-  --surface-edge: var(--muted-gold);
-  --text: #fbf7ee; /* ivory: 14.3:1 on purple, 7.8:1 on bamboo */
-  --text-soft: #e3dcd0;
-  --text-muted: #c18a39; /* text-safe muted gold on purple */
-  --on-surface-muted: #e6ca95; /* labels on bamboo cards */
-  --line: rgba(183, 121, 31, 0.35);
-  --accent: var(--gold);
-  --accent-press: #ecc94b;
-  --on-accent: var(--royal-purple);
-  --success: var(--bamboo-green);
-  --pending: var(--gold);
-  --chip: #201a38; /* status chips read on purple and on bamboo */
-  --danger: #feb2b2;
-  --danger-tint: rgba(254, 178, 178, 0.12);
-  --shadow: 0 1px 0 rgba(246, 224, 94, 0.14) inset, 0 14px 34px -20px rgba(0, 0, 0, 0.75);
+  --headline: #fce9c5;
+  --text: #f4e8da;
+  --muted: #98827c;
+  --secondary: #a1949b;
+  --helper: #8a7d86;
+  --on-input: #b3a6ad;
+  --stat-label: #d0bdb7;
 
-  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "Noto Serif",
-    "Source Serif Pro", Georgia, serif;
+  --cta: #fdcf10;
+  --cta-press: #e9bd06;
+  --on-cta: #110803;
+  --select: #f9ce22;
+  --tab-active: #cfb242;
+  --tab-idle: #a396a1;
+
+  --ok: #9ad999;
+  --ok-bg: #272f28;
+  --ok-dot: #8feb8c;
+  --wait: #e8b872;
+  --wait-bg: #3a2827;
+  --wait-hi: #f2bf72;
+  --danger: #ff9c8f;
+  --danger-bg: #3a1a22;
+
+  --qr-paper: #fdf0ce;
+  --qr-ink: #1d0e25;
+
+  --serif: "Noto Serif Display", "Noto Serif", "Iowan Old Style", "Palatino Linotype", Palatino,
+    Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial,
     sans-serif;
   --mono: ui-monospace, "SF Mono", "Roboto Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
 
-  --radius: 14px;
-  --tap: 52px; /* gloved-hand friendly */
-  --gutter: 20px;
-  --tabbar: 64px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --tap: 52px;
+  --gutter: 18px;
+  --tabbar: 68px;
+  --maxw: 560px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  /* OLED / night: the darker brand base; cards and accents stay on brand. */
-  :root {
-    --bg: var(--dark-purple);
-    --bg-deep: #141424;
-    --chip: #12121f;
-  }
+/* The Android app draws edge to edge (MainActivity.enableEdgeToEdge, targetSdk 35+).
+   A WebView that reports no insets would put the header under the status bar
+   and the tabs under the gesture bar, so the app keeps a minimum clearance. */
+:root[data-shell="device"] {
+  --safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 *,
@@ -70,148 +85,90 @@
 
 html,
 body {
-  background-color: var(--bg);
-  /* A soft pool of light from above, like a dining room at service, plus a
-     faint velvet grain drawn inline so nothing is fetched. */
-  background-image:
-    radial-gradient(120% 60% at 50% -10%, rgba(246, 224, 94, 0.07), transparent 60%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .9 0 0 0 0 .6 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-attachment: fixed;
+  margin: 0;
+  background: var(--bg);
   color: var(--text);
-  font-family: var(--sans);
-  font-size: 16px;
-  line-height: 1.5;
+  font: 400 16px/1.45 var(--sans);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: inherit;
 }
 
-h1,
-h2,
-h3 {
-  font-family: var(--serif);
-  font-weight: 600;
-  letter-spacing: 0.005em;
-  margin: 0;
+button,
+input {
+  font: inherit;
+  color: inherit;
 }
 
-.display {
-  font-size: clamp(30px, 8.4vw, 40px);
-  line-height: 1.12;
+img {
+  display: block;
+  max-width: 100%;
 }
 
-.kicker {
-  margin: 0 0 10px;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.lede {
-  color: var(--text-soft);
-  margin: 14px 0 0;
-  max-width: 34ch;
-}
-
-/* A length of bamboo: muted-gold segments with small nodes between them. */
-.rule {
-  height: 2px;
-  border: 0;
-  margin: 26px 0;
-  background: repeating-linear-gradient(90deg, var(--muted-gold) 0 64px, transparent 64px 70px);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  opacity: 0.75;
-}
-
-.card {
-  /* Bamboo tray: brand brown with a faint lacquer sheen and a muted-gold edge
-     (brown on purple alone is only 1.84:1, so the edge carries the shape). */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%), var(--surface);
-  border: 1px solid var(--surface-edge);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
-}
-
-.btn {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: var(--tap);
-  padding: 0 22px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  font: 600 16px/1 var(--sans);
-  letter-spacing: 0.01em;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    transform 80ms ease;
-}
-
-.btn:active {
-  transform: translateY(1px);
-}
-
-.btn:focus-visible,
-.tab:focus-visible,
-.segment button:focus-visible {
-  outline: 2px solid var(--accent);
+:focus-visible {
+  outline: 2px solid var(--select);
   outline-offset: 3px;
 }
 
-.btn[disabled] {
-  opacity: 0.55;
-  cursor: default;
+/* ---------- Type ---------- */
+
+.display {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(28px, 8.8vw, 44px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: var(--headline);
+  text-wrap: balance;
 }
 
-.btn.primary {
-  background: var(--accent);
-  color: var(--on-accent);
-  box-shadow: 0 8px 22px -12px rgba(246, 224, 94, 0.55);
+.title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--headline);
 }
 
-.btn.primary:active {
-  background: var(--accent-press);
+.kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
-.btn.quiet {
-  background: transparent;
-  border-color: var(--muted-gold);
-  color: var(--text);
+.caps {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
-.btn.block {
-  width: 100%;
+.muted {
+  color: var(--secondary);
+}
+
+.helper {
+  color: var(--helper);
+  font-size: 13.5px;
 }
 
 .mono {
   font-family: var(--mono);
   font-size: 13px;
-  letter-spacing: 0.02em;
-}
-
-.muted {
-  color: var(--text-muted);
-}
-
-/* On bamboo cards muted gold drops to 2.28:1, so muted text turns pale gold. */
-.card .muted,
-.on-surface .muted {
-  color: var(--on-surface-muted);
 }
 
 .visually-hidden {
-  position: absolute;
+  position: absolute !important;
   width: 1px;
   height: 1px;
   overflow: hidden;
@@ -219,11 +176,107 @@ h3 {
   white-space: nowrap;
 }
 
+/* ---------- Surfaces ---------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+.list-card {
+  background: var(--list);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 0 22px;
+  border-radius: var(--radius);
+  border: 1.5px solid transparent;
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 90ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn.primary {
+  background: var(--cta);
+  color: var(--on-cta);
+}
+
+.btn.primary:active:not(:disabled) {
+  background: var(--cta-press);
+}
+
+.btn.outline {
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--text);
+}
+
+.btn.gold {
+  background: transparent;
+  border-color: var(--tab-active);
+  color: var(--headline);
+}
+
+.btn.block {
+  width: 100%;
+}
+
+.btn.tall {
+  min-height: 56px;
+}
+
+/* ---------- Page scaffold ---------- */
+
+.page {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--gutter) 28px;
+}
+
+.stack > * + * {
+  margin-top: var(--gap, 16px);
+}
+
+.error {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
+    transition: none !important;
+    animation: none !important;
   }
 }
