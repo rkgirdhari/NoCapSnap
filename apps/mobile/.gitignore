@@ -1,0 +1,8 @@
+# Continuous Native Generation: EAS runs `expo prebuild` from app.json.
+# Committing these would make EAS skip prebuild and ignore app.json changes.
+/android
+/ios
+
+expo-env.d.ts
+.env
+google-play-service-account.json

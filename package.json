@@ -1,0 +1,22 @@
+{
+  "name": "nocapsnap",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CapSnap by Hammurabi Coding Company LLC — staff-captured dish photos tied to customer reviews",
+  "author": "R. K. Girdhari <hammurabicoding@example.com>",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:mobile": "pnpm --filter @nocapsnap/mobile start",
+    "dev:api": "pnpm --filter @nocapsnap/api dev",
+    "android": "pnpm --filter @nocapsnap/mobile android",
+    "build": "turbo build",
+    "build:android": "pnpm --filter @nocapsnap/mobile build:android",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@9.12.0"
+}
