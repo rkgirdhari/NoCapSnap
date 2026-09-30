@@ -1,6 +1,6 @@
-# W2 — PROPOSAL: staff UI from the owner's mockups (not approved)
+# W2 — Staff UI from the owner's mockups (local vertical slice)
 
-Date: 2026-09-30 · Status: **Proposed**. Nothing here is built. W2 needs explicit owner approval (protocol rule 1).
+Date: 2026-09-30 · Status: **Approved by the owner, in progress** (see "Owner decisions").
 
 **Input.** Five high-fidelity mockups from the owner, titled "NO CAP SNAP":
 1. Home
@@ -15,12 +15,12 @@ They are now committed in [`../design/mockups/`](../design/mockups/) with SHA-25
 ## Gate report
 
 ```
-## Gate W2 — Local vertical slice (proposed)
-Status: Specified (this document) — nothing built
+## Gate W2 — Local vertical slice
+Status: In progress — approved 2026-09-30 with the D7 device check waived by the owner
 Evidence: none yet; W2 exit evidence is defined below
 Changes: this file only
 Tenth Man: building this UI before the device camera check (D7) contradicts Spec §7's hard gate
-Decision needed from owner: approve W2 with these mockups as the target, and answer M1–M6
+Decision needed from owner: M4–M6 still open (defaults applied, see below)
 ```
 
 ## Screen-by-screen mapping
@@ -109,3 +109,16 @@ Exit evidence:
   satisfy the spec.
 - **M6 — Table label.** Device-only (staff reference, never synced) or synced to the server as staff metadata? It
   is never shown to guests either way.
+
+## Owner decisions (2026-09-30)
+
+| # | Question | Owner's answer | Applied as |
+|---|---|---|---|
+| M1 | Build before the D7 device check? | *"Send me the QR Code and then waive and move on"* | D7 waived; install QR sent; W2 started |
+| M2 | Name on screen | NO CAP SNAP in-app | In-app wordmark "NO CAP SNAP"; the Android label and Play listing stay "CapSnap" (Spec §1) |
+| M3 | Canonical colours | Mockup palette | The measured palette (`../design/mockups/README.md`) becomes the design tokens |
+| O1 | Onboarding | *"Build in the URL Search & Scrape for the Restaurant being requested … where they either link it or give us permission to scrape"* | **Consent-based import from the restaurant's own website** replaces the Google Places idea (see ONB-1). No third-party service. |
+| M4 | Display serif | not answered | **Default:** the device serif stays (no bundled font) |
+| M5 | Status wording | not answered | **Default:** chips carry the mockup's look with the spec's words ("Saved offline · QR not ready") |
+| M6 | Table label | not answered | **Default:** device-only; never synced or shown to guests |
+

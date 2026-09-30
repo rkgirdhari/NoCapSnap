@@ -279,3 +279,13 @@ Report back for each step: pass or fail, plus a screenshot of anything that look
   `uname -a; systemctl --version | head -1; nproc; free -h; df -h /` run over SSH on the server. Don't send
   passwords or keys.
 - **D6 (open from W0).** minSdk; W1 kept 24.
+
+## Closure (2026-09-30)
+
+- **D7 waived by the owner.** In the owner's words: *"Send me the QR Code and then waive and move on."* An
+  install QR (which opens the session holding the purple APK) was sent. The device checklist was **not** run
+  before closing, so every "Specified" item above (both camera routes on Android, SQLite in the app sandbox,
+  edge-to-edge insets) stays **Specified**. The checklist still applies whenever the owner runs it.
+- **D8 closed:** Royal Purple + Gold + Bamboo was applied, then superseded in W2 by the measured mockup palette (M3).
+- **W1 status: closed by owner waiver.** Work continues in W2.
+

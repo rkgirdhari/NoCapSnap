@@ -1,6 +1,6 @@
 # ONB-1 — Onboarding auto-fill from public data
 
-Status: **Aspirational**. Not scheduled in any gate. Recorded 2026-09-30 from an owner-forwarded analysis that
+Status: **Specified**, approved for build (owner, 2026-09-30) as *consent-based import from the restaurant's own website*. The Google Places route stays Aspirational. Recorded 2026-09-30 from an owner-forwarded analysis that
 proposes Google Places API search, suggestion and pre-fill for new restaurants, plus a blank menu template.
 
 ## Where the analysis stands against the spec
@@ -45,3 +45,31 @@ in W3.
 
 **O1:** Launch with manual onboarding (option 1) and keep auto-fill Aspirational? Or amend the spec to allow a
 third-party lookup (option 3)?
+
+## Owner decision (O1, 2026-09-30) and design
+
+Owner: *"Build in the URL Search & Scrape for the Restaurant being requested or customer etc where they either
+link it or give us permission to scrape."*
+
+Design (a server-side Rust crate, host-tested now, wired to `POST /api/v1/onboarding/import` with the W3 server):
+
+1. **Consent.** The requester gives the restaurant's website URL and confirms *"I own or manage this website and
+   allow NO CAP SNAP to read its public pages for this setup."* The request records who consented, when, and to
+   which URL.
+2. **Fetch safely:**
+   - Only `https`/`http` URLs on the given site's registrable domain.
+   - No private, loopback or link-local IPs, checked after DNS resolution, so it can't be abused for SSRF.
+   - At most 3 redirects, a response-size cap, a timeout, and a few pages at most (home page plus pages linked as
+     "menu").
+   - `robots.txt` is honoured; the user agent identifies itself.
+   - A deny-list of aggregator and review sites (Google, Yelp, TripAdvisor and similar). Spec §1: no review data.
+3. **Extract.**
+   - First choice: schema.org `Restaurant` / `LocalBusiness` JSON-LD (name, address, telephone, url, cuisine,
+     opening hours, `hasMenu` → `MenuSection` / `MenuItem`).
+   - Fallbacks: OpenGraph, `<title>`/`<h1>`, `tel:` links, microdata.
+   - No photos are imported (copyright). Raw HTML is not stored.
+4. **Pre-fill only.** The result is a draft organization, location and menu for the requester to review and edit.
+   Nothing is saved until they confirm.
+5. **"Search".** Name-based web search would need a third-party search engine (Spec §2/§6), so it isn't built.
+   Search means discovering the menu pages *within* the linked site.
+
