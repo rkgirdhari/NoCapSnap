@@ -147,18 +147,25 @@ How to read it:
   (`app/build.gradle.kts`).
 - **Size:** the debug APK is about 150 MB of content, 143 MB of which is the unoptimized debug Rust library.
 
-Release APK (`pnpm tauri android build --apk --target aarch64`, then `zipalign -P 16` and `apksigner` with the
-**debug** keystore, for side-loading only; Play upload signing is W5):
+Release APK, Royal Purple build (`pnpm tauri android build --apk --target aarch64`, then `zipalign -P 16` and
+`apksigner` with a **debug** keystore, for side-loading only; Play upload signing is W5):
 
 ```
-capsnap-w1-arm64-release-debugsigned.apk   9,648,726 bytes
-sha256 c9a2e9a13f661ac83b0aa41610e30d1df6fd0dacb09822f5112dd13225223f64
+capsnap-w1-purple-arm64-release-debugsigned.apk   9,648,726 bytes
+sha256 2e11c042da3547668d9075722b0423f85798669b0474ce85c5e7e8e59d18f74d
 minSdkVersion:'24'  targetSdkVersion:'37'  native-code: 'arm64-v8a'
 uses-permission: INTERNET, CAMERA (+ AndroidX signature-level receiver permission)
+uses-feature: android.hardware.camera.any (rear camera not required)
 zipalign -c -P 16 -v 4 → Verification successful
 usesCleartextTraffic=false   (not debuggable)
-libcapsnap_app_lib.so 7,897,224 bytes, LOAD 0x4000
+color/capsnap_royal_purple #ff2d1b4e · color/ic_launcher_background #ff2d1b4e
+libcapsnap_app_lib.so 7,897,304 bytes, LOAD 0x4000
 ```
+
+The first release APK (lacquer palette, sha256 `c9a2e9a1…3f64`) is superseded. The build environment was re-created
+mid-gate: Maven Central returned HTTP 429 to this sandbox, so Gradle resolved Central artifacts through Google's
+official mirror (`maven-central.storage-download.googleapis.com`, via a sandbox-only init script outside the repo).
+The project files are unchanged.
 
 Store tests (`spikes/w0-sqlite-android/scripts/test-host.sh`):
 
