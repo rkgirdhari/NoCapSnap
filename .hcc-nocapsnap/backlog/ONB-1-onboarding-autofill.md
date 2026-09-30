@@ -1,6 +1,8 @@
 # ONB-1 — Onboarding auto-fill from public data
 
-Status: **Specified**, approved for build (owner, 2026-09-30) as *consent-based import from the restaurant's own website*. The Google Places route stays Aspirational. Recorded 2026-09-30 from an owner-forwarded analysis that
+Status: **Built (library, host-tested)** in W2 as `crates/capsnap-onboard`: consent-based import from the
+restaurant's own website (owner, 2026-09-30). **Specified:** the `POST /api/v1/onboarding/import` endpoint and the
+review screen (W3, with the server). The Google Places route stays Aspirational. Recorded 2026-09-30 from an owner-forwarded analysis that
 proposes Google Places API search, suggestion and pre-fill for new restaurants, plus a blank menu template.
 
 ## Where the analysis stands against the spec

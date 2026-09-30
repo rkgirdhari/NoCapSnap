@@ -1,0 +1,21 @@
+[package]
+name = "capsnap-onboard"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "CapSnap onboarding import: consent-based read of a restaurant's own website into a draft (ONB-1)"
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[dependencies]
+reqwest = { version = "0.13.5", default-features = false }
+scraper = "0.27.0"
+url = "2.5.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["net", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "time", "sync"] }
