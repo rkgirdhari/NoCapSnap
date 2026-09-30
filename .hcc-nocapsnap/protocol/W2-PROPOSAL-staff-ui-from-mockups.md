@@ -9,9 +9,8 @@ Date: 2026-09-30 · Status: **Proposed**. Nothing here is built. W2 needs explic
 4. History while offline
 5. Guest invitation / QR
 
-They were shown inline in chat and are **not saved in the repo or the sandbox**. The owner should commit them
-(for example `nocapsnap/.hcc-nocapsnap/design/mockups/`) so later gates can cite them. Colours below are visual
-estimates; they could not be sampled.
+They are now committed in [`../design/mockups/`](../design/mockups/) with SHA-256 checksums. Their palette was
+**measured** from the files, not estimated; see `../design/mockups/README.md` and `../design/sample-mockups.py`.
 
 ## Gate report
 
@@ -37,17 +36,27 @@ Decision needed from owner: approve W2 with these mockups as the target, and ans
 | **Insights** tab | Aggregated private feedback | Placeholder only | Needs feedback data (after W3) | §1 internal QC only; never public |
 | **Settings** tab | Account, location, sign-out, the W1 device check | Device check and about screen | Sign-out and session revocation | §7 runbook: device lost |
 
-## Visual deltas from the current W1 build (estimated from the images)
+## Visual deltas from the current W1 build (measured from the mockup files)
 
-- **Wordmark:** "NO CAP SNAP" in widely tracked capitals, replacing the "CS" seal plus "CapSnap".
-- **Headlines:** a high-contrast display serif in a cream-to-gold tone, larger and tighter than the current system
-  serif.
-- **Base colour:** a deeper aubergine than `#2D1B4E`.
-- **Cards:** a desaturated plum-brown rather than `#744210`.
-- **CTA:** a more saturated yellow than `#F6E05E`.
-- **Chips:** carry icons (hourglass, QR) and warm amber for "waiting".
-- **Photography:** real dish photos everywhere (hero, list thumbnails, dish cards).
-- **Tabs:** Home, History, Insights, Settings. Capture moves to the primary CTA; Manager is folded into Settings.
+| Role | W1 build (brand sheet, D8) | Mockups (measured) | Mockup contrast |
+|---|---|---|---|
+| Background | Royal Purple `#2D1B4E` | Deep aubergine `#190926` | — |
+| Headline | Ivory `#FBF7EE`, system serif | Cream `#FCE9C5`, high-contrast display serif | 15.88:1 |
+| Primary CTA | Gold `#F6E05E` | Warm yellow `#FDCF10` with ink `#110803` | 13.31:1 |
+| Cards | Bamboo Brown `#744210` with a muted-gold edge | Layered plum-browns: `#2A1B27` (dish, review), `#1E1223` (list), `#533A39` (stat card, pill), `#402C2E` (input) | stat card against background 1.83:1, so it needs a border (as W1 found) |
+| Muted text | Text-safe muted gold `#C18A39` | Warm mauve-greys `#98827C`, `#A1949B`, `#8A7D86` | 4.66–6.71:1 |
+| Synced / online | Bamboo Green `#68D391` | `#9AD999` on chip `#272F28`; dot `#8FEB8C` | 8.37:1 |
+| Waiting / offline | Gold chip | Amber `#E8B872` on `#3A2827`; `#F2BF72` | 7.62:1, 11.25:1 |
+| QR | White card, dark modules | Cream `#FDF0CE`, aubergine modules `#1D0E25` | 16.23:1 |
+
+**Every text pair measured in the mockups passes WCAG AA**; the lowest is the Review kicker at 4.66:1.
+
+Other deltas:
+
+- **Wordmark:** "NO CAP SNAP" in tracked capitals.
+- **Chips:** carry icons (hourglass, QR).
+- **Photography:** dish photos everywhere.
+- **Tabs:** Home, History, Insights, Settings. Capture becomes the primary CTA; Manager folds into Settings.
 
 ## Proposed W2 scope and exit evidence
 
@@ -90,8 +99,9 @@ Exit evidence:
   gate)?
 - **M2 — Name on screen.** The in-app wordmark "NO CAP SNAP" versus Spec §1's official display name "CapSnap".
   Proposal: the Android label and Play listing stay "CapSnap"; the in-app wordmark is "NO CAP SNAP".
-- **M3 — Canonical colours.** Keep the brand-sheet hexes (contrast-verified in W1), or send the mockup source file
-  or exact hexes so they can be measured?
+- **M3 — Canonical colours.** The mockups (measured above, all AA) or the brand sheet (W1)? Recommendation:
+  adopt the measured mockup palette as the design tokens, since it's the owner's most detailed artefact and it
+  passes AA. Keep the brand-sheet names as the marketing palette.
 - **M4 — Display serif.** Bundle an OFL display serif to match the mockups (licence and size checked first), or
   stay with the phone's system serif?
 - **M5 — Status wording.** The mockup chips say "Waiting to sync". Spec §3 requires "saved offline / QR not ready"
