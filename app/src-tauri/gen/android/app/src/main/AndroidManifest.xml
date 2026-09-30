@@ -10,7 +10,13 @@
          from devices that only have a front one. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Spec §6: photos, the outbox and staff settings stay on this device. No
+         Google cloud backup and no device-to-device transfer (API 31+ reads
+         dataExtractionRules; older versions read allowBackup / fullBackupContent). -->
     <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.capsnap_app"
