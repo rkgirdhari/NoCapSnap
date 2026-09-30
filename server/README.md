@@ -55,6 +55,7 @@ The guest page is served at `/g/`.
   - Photos are deleted 30 days after sync. Photos that never got a capture are deleted after 1 day.
   - Feedback is deleted after 12 months.
   - Expired guest sessions and old device sessions are deleted.
-  - Operational logs are kept for 30 days, via the journald `MaxRetentionSec=30day` setting (W3b).
+  - Operational logs are kept for 30 days, via a journald namespace for this service
+    (`LogNamespace=capsnap`, `MaxRetentionSec=30day`; W3b).
 
 Tests: `scripts/test-host.sh`.

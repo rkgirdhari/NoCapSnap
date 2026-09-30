@@ -108,3 +108,46 @@ Schema entities:
   or waive it again?
 - **R1 — Real guest data.** Allow real guest feedback only after the W4 backup restore drill passes
   (recommended)?
+
+## D4 intake (2026-09-30)
+
+The owner sent the VPS deployment and infrastructure documents. *[Details redacted for publication.]* Addresses and credentials
+from them were never copied here.
+
+**What the docs establish** (**Specified**: owner documentation, not yet observed on the box):
+
+- **The product is a ZAP Hosting VPS with root access, not web space.** Spec §7's hard gate ("Axum requires a
+  long-running Linux process") is met on paper: other apps already run there as systemd services.
+- **nginx owns ports 80 and 443**, with Let's Encrypt certificates and one server block per site.
+- **The box is shared with other services.** Their deploy conventions, ports and software were taken into
+  account. *[Details redacted for publication.]*
+
+**How W3b changes as a result:**
+
+| # | Change | Why |
+|---|---|---|
+| 1 | **G2 becomes nginx**, not Caddy, using the existing certificate flow | Caddy would need ports 80 and 443, which nginx already holds |
+| 2 | Set nginx `client_max_body_size 10m` on the CapSnap server block | nginx's 1 MB default would refuse most photos with a 413 (the server allows 10 MiB) |
+| 3 | Data lives in `/var/lib/capsnap`, **outside** `/var/www/capsnap` | `rsync --delete` would erase the database and photos. A tar rollback would also restore old data, losing feedback and reviving used guest links |
+| 4 | Bind to `127.0.0.1:8090` (`CAPSNAP_BIND`); never open it in `ufw` | 8090 is free on the box. Only nginx should face the internet |
+| 5 | Keep logs 30 days with a journald namespace (`LogNamespace=capsnap`, `journald@capsnap.conf`), not the global setting | A global `MaxRetentionSec` would also cut every other service's logs. Needs systemd ≥ 245 |
+| 6 | Run as a dedicated `capsnap` system user with systemd hardening | The service doesn't need root |
+| 7 | Ship a static musl binary (`x86_64-unknown-linux-musl`) | A glibc binary built on `ubuntu-latest` can fail on an older VPS with `GLIBC_2.xx not found` |
+| 8 | A new Rust workflow at the repo root, not the Node template:<br>• tests block the deploy;<br>• `actions/*-artifact@v4`;<br>• a pinned host key | The existing template targets Node projects. `ssh-keyscan` at deploy time trusts whichever host answers |
+| 9 | nginx adds HSTS for the guest domain | The server sets CSP and the other headers, but not HSTS |
+| 10 | No analytics on the guest page | Spec §6. The portal's CSP would block it anyway |
+
+**Unchanged:**
+
+- **Backups.** The pre-deploy tar snapshots sit on the same disk and are not Spec Phase 4 backups. R1 stands:
+  test data only until W4.
+- **Merging PR #1 deploys nothing.** This repository has no root `.github/workflows/`. The only workflow file,
+  `hms-stele/.github/workflows/ci.yml`, is nested, so GitHub never runs it.
+
+**Still open:**
+
+- **G1: the guest domain.** Not in the docs.
+- **The box's real numbers.** Architecture, OS version, systemd version, memory and disk are unknown. These become
+  W3b step 1: read-only checks on the box before anything is installed. Memory matters because the box is shared
+  with other services.
+- **Owner approval to open W3b.**
