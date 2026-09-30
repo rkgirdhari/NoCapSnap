@@ -1,0 +1,26 @@
+[package]
+name = "capsnap-store-spike"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "W0 feasibility spike: local-first SQLite outbox cross-compiled for Android (API 36)"
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[lib]
+# cdylib mirrors how Tauri ships the Rust core on Android (lib<name>.so).
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+# sqlite-bundled compiles SQLite from source with the target's C compiler
+# (the NDK clang on Android) — the thing this spike has to prove.
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "migrate", "macros"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = "debuginfo"
