@@ -2,6 +2,7 @@ node_modules
 dist
 .expo
 .turbo
+.data
 .env
 .env.local
 *.jks

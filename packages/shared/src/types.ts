@@ -46,7 +46,10 @@ export interface Photo {
   thumbnailUrl: string;
   tableNumber?: string;
   qrCodeToken: string;
+  /** PNG of the QR code the guest scans; it encodes `reviewUrl`. */
   qrCodeUrl: string;
+  /** Guest review link, also suitable for SMS. */
+  reviewUrl: string;
   status: PhotoStatus;
   capturedAt: string;
 }

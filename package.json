@@ -12,6 +12,7 @@
     "android": "pnpm --filter @nocapsnap/mobile android",
     "build": "turbo build",
     "build:android": "pnpm --filter @nocapsnap/mobile build:android",
+    "test": "turbo test",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {

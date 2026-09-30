@@ -48,6 +48,7 @@ Useful checks:
 
 ```bash
 pnpm typecheck                        # all packages
+pnpm test                             # API unit tests (vitest)
 pnpm build                            # bundles the API to services/api/dist
 pnpm --filter @nocapsnap/mobile run doctor   # expo-doctor
 ```
@@ -57,13 +58,55 @@ pnpm --filter @nocapsnap/mobile run doctor   # expo-doctor
 | Method | Path | Status |
 |---|---|---|
 | GET | `/health` | Live — returns product / company / founder |
-| POST | `/api/photos/capture` | Validates body with zod, then **501** (stub) |
-| GET | `/api/photos/qr/:token` | **404** until photos are persisted (stub) |
+| POST | `/api/photos/capture` | Live — stores the photo set and returns a `Photo` (**201**) |
+| GET | `/api/photos/qr/:token` | Live — looks the photo up by its QR token (in-memory store) |
 | POST | `/api/reviews` | Validates body with zod, then **501** (stub) |
 
 Errors always come back as `{ "error": string, "code"?: string }`
-(`ApiError` in `@nocapsnap/shared`): 400 for validation / bad JSON,
-501 for unimplemented services, 500 otherwise.
+(`ApiError` in `@nocapsnap/shared`): 400 for validation, bad JSON or an unreadable
+image, 413 for oversized uploads, 501 for unimplemented services, 500 otherwise.
+
+### Photo capture
+
+`POST /api/photos/capture` takes a JPEG, PNG or WebP as base64 (a `data:` URL
+prefix is fine, max 8 MB decoded) and:
+
+1. Auto-rotates it from EXIF and strips all metadata, including any GPS tags.
+2. Stamps a band across the bottom: **CapSnap**, a short verification code
+   (first 8 characters of the photo id), and table number + capture time (UTC).
+   The watermarked copy is capped at 2048 px on the long edge.
+3. Makes a 480 px-wide thumbnail of the watermarked image.
+4. Generates a random 128-bit review token and a QR PNG that encodes
+   `${APP_URL}/r/<token>` (also returned as `reviewUrl`, e.g. for SMS).
+5. Uploads everything under `locations/<locationId>/photos/<photoId>/`
+   (`original.jpg`, `watermarked.jpg`, `thumbnail.jpg`, `qr.png`) and saves the
+   `Photo` record.
+
+Still stubbed: `staffId` is a placeholder until auth lands; photo records live
+in memory (`InMemoryPhotoRepository`) and are lost on restart; dish and location
+names aren't on the stamp yet because there are no menu/location tables —
+`stampSvg` already accepts `dishName`, `locationName` and `timeZone`.
+
+### Photo storage
+
+| `STORAGE_DRIVER` | Behaviour |
+|---|---|
+| `local` (default) | Writes to `services/api/.data/uploads` (`LOCAL_STORAGE_DIR`) and serves it at `${API_URL}/files/…` |
+| `s3` | Uploads to `S3_BUCKET` in `AWS_REGION`; credentials come from the AWS SDK default chain |
+
+The API reads settings from its process environment (it doesn't load `.env`
+files), e.g. `STORAGE_DRIVER=s3 S3_BUCKET=nocapsnap-photos pnpm dev:api`.
+
+For S3, keep the bucket private and serve it through CloudFront with Origin
+Access Control; set `CLOUDFRONT_DOMAIN` and the returned URLs use it. Without
+it, URLs point straight at the bucket and only work if objects are public. If
+originals shouldn't be guest-visible, limit the CloudFront behaviour to
+`*/watermarked.jpg`, `*/thumbnail.jpg` and `*/qr.png`. `S3_ENDPOINT` targets an
+S3-compatible store (MinIO, Cloudflare R2, LocalStack) with path-style URLs.
+
+The watermark text is rendered by sharp through the system's fonts. Slim
+server images often have none, so the band would render without text; install
+one, e.g. `apt-get install -y fonts-dejavu-core` on Debian-based images.
 
 `pnpm build` bundles `@nocapsnap/shared` into `dist/server.js` with tsup, so
 `pnpm --filter @nocapsnap/api start` runs on plain Node.
@@ -119,6 +162,8 @@ regenerates them from `app.json` on every build, so change native config there.
 
 ## Next implementation pass
 
-- `PhotoService.capture` — S3 upload, watermark, QR token, Postgres row.
+- Postgres-backed `PhotoRepository`, plus menu/location lookups so the stamp
+  shows dish, restaurant and local time.
+- Show the returned QR (`qrCodeUrl`) and `reviewUrl` on the mobile `send` screen.
 - Real staff auth to replace `loginStub` (JWT stored in `expo-secure-store`).
 - Dish selector on the capture screen; photo log on `history`.
