@@ -18,12 +18,12 @@ export default function HomeScreen() {
         </Pressable>
       </Link>
       <Link href="/capture" asChild>
-        <Pressable style={[styles.btn, styles.ghost]}>
+        <Pressable style={styles.ghostBtn}>
           <Text style={styles.ghostText}>Open camera (stub)</Text>
         </Pressable>
       </Link>
       <Link href="/history" asChild>
-        <Pressable style={[styles.btn, styles.ghost]}>
+        <Pressable style={styles.ghostBtn}>
           <Text style={styles.ghostText}>Photo log</Text>
         </Pressable>
       </Link>
@@ -44,6 +44,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnText: { color: "#0B0F0C", fontWeight: "700" },
-  ghost: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#C8F5C0" },
+  // <Link asChild> passes style through expo-router's Slot, which throws on
+  // style arrays in development — keep these single objects.
+  ghostBtn: {
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#C8F5C0",
+  },
   ghostText: { color: "#C8F5C0", fontWeight: "700" },
 });
