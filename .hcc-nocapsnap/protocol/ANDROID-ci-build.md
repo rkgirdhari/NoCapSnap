@@ -147,7 +147,8 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 | Packaging script: align, sign, check, checksums | **Built** | Run locally on the W3a build, in both signing modes and the failure cases |
 | The workflow building the APK on GitHub | **Built** | Run 36902688713, green; the APK was re-verified after download |
 | The CI APK running on a phone | **Specified** | Sent to the owner on 2026-10-01; device check D9 is still open |
-| Tag or manual run → GitHub Release | **Specified** until the first release | Release step dry-run locally against a stub `gh`: manual run creates the tag; an existing tag on a manual run stops it; a pushed tag creates the release; a release made by hand gets the build attached |
+| Manual run → GitHub Release | **Built** | [v0.1.0](https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0), run 36926943872: tag on `bfa5cf0`, pre-release, APK and `SHA256SUMS.txt` attached. The APK was re-downloaded from the release: its checksum matches, it is signed, `arm64-v8a`, and stripped |
+| Pushed tag, or a release made by hand → GitHub Release | **Specified** | Not run yet; dry-run locally against a stub `gh` |
 | Upload-key signing of a real `.aab` | **Specified** | Tested with a stand-in key and bundle; needs the real key (W5) |
 | Google Play accepting the bundle | **Specified** | W5 |
 
@@ -170,3 +171,10 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
   - This leaves out phones that only run 32-bit apps, and x86_64 Chromebooks and emulators.
   - Adding ABIs is one flag per target, at the cost of a larger APK and a longer build.
 - **Build time.** About 10–20 minutes per app change. Actions minutes are free for public repositories.
+
+## First release: v0.1.0 (2026-10-01)
+
+- **Made by:** a manual run of the Android workflow on `main` with "publish a release", requested by the owner ("tag v0.1.0 so the APK gets kept"). The tag could not be pushed from the cloud workspace: its git access returns HTTP 403 for tags.
+- **Release:** <https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0>. It is a pre-release, because the build is test-signed. Tag `v0.1.0` points to `bfa5cf0`.
+- **APK:** `CapSnap_0.1.0_arm64_test-signed.apk`, 14,842,510 bytes, sha256 `d83ed22ef5cf810be7a92f7bb42201d6d6b6924fca78e56a345c7aab49f866ea`.
+- **Not in the release:** the Windows installers. `desktop.yml` has no release step, so they stay as 30-day artifacts.
