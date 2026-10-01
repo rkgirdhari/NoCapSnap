@@ -26,7 +26,7 @@ Decision needed from owner: none to merge. Later (W5): create the Play upload ke
 | A PR or a push to `main` that touches the app or its crates | Artifact `capsnap-android`: `CapSnap_0.1.0_arm64_test-signed.apk` and `SHA256SUMS.txt` | 30 days |
 | A tag `vX.Y.Z` that equals the app version in `tauri.conf.json` | The same build as a **GitHub Release** (a pre-release while builds are test-signed) | Permanently |
 | On demand: Actions → Android → Run workflow | The same as a push | 30 days |
-| On demand on `main`, with **"publish a release"** ticked | The same build as GitHub Release `v<app version>`. GitHub creates the tag on the built commit, for when a tag can't be pushed (this workspace's git access can push branches but not tags) | Permanently |
+| On demand on `main`, with **"publish a release"** ticked | The same build as GitHub Release `v<app version>`, for when a tag can't be pushed (this workspace's git access can push branches but not tags). If the tag doesn't exist, `main` is built and GitHub creates the tag on it; if it does, the tag's commit is built and the APK is added to its release | Permanently |
 
 **Every build fails the run if any check fails.** The checks are the ones the W1–W3a gate reports ran by hand:
 
@@ -148,7 +148,7 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 | The workflow building the APK on GitHub | **Built** | Run 36902688713, green; the APK was re-verified after download |
 | The CI APK running on a phone | **Specified** | Sent to the owner on 2026-10-01; device check D9 is still open |
 | Manual run → GitHub Release | **Built** | [v0.1.0](https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0), run 36926943872: tag on `bfa5cf0`, pre-release, APK and `SHA256SUMS.txt` attached. The APK was re-downloaded from the release: its checksum matches, it is signed, `arm64-v8a`, and stripped |
-| Pushed tag, or a release made by hand → GitHub Release | **Specified** | Not run yet; dry-run locally against a stub `gh` |
+| Pushed tag, a release made by hand, or adding to an existing release → GitHub Release | **Specified** | Not run yet for Android; the shared `.github/scripts/publish-release.sh` and the source step were dry-run locally (stub `gh`; a shallow clone of a local remote with and without the tag) |
 | Upload-key signing of a real `.aab` | **Specified** | Tested with a stand-in key and bundle; needs the real key (W5) |
 | Google Play accepting the bundle | **Specified** | W5 |
 
@@ -177,4 +177,4 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 - **Made by:** a manual run of the Android workflow on `main` with "publish a release", requested by the owner ("tag v0.1.0 so the APK gets kept"). The tag could not be pushed from the cloud workspace: its git access returns HTTP 403 for tags.
 - **Release:** <https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0>. It is a pre-release, because the build is test-signed. Tag `v0.1.0` points to `bfa5cf0`.
 - **APK:** `CapSnap_0.1.0_arm64_test-signed.apk`, 14,842,510 bytes, sha256 `d83ed22ef5cf810be7a92f7bb42201d6d6b6924fca78e56a345c7aab49f866ea`.
-- **Not in the release:** the Windows installers. `desktop.yml` has no release step, so they stay as 30-day artifacts.
+- **Windows installers:** not in the first publish. Added later by `desktop.yml`'s release step, built from the same tagged commit (see the Desktop record).
