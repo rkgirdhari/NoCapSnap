@@ -231,7 +231,7 @@ version = "0.0.0"
 dependencies = [
  "argon2",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "capsnap-onboard",
  "chrono",
  "futures-util",
@@ -252,7 +252,7 @@ dependencies = [
 name = "capsnap-store"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "image",
  "sha2 0.10.9",
