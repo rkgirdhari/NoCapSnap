@@ -1,0 +1,28 @@
+[package]
+name = "capsnap-app"
+version = "0.1.0"
+description = "CapSnap staff app (Tauri shell for Android)"
+authors = ["Hammurabi Coding Company LLC"]
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[lib]
+# Tauri ships the Rust core on Android as lib<name>.so.
+name = "capsnap_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+capsnap-store = { path = "../../crates/capsnap-store" }
+capsnap-sync = { path = "../../crates/capsnap-sync" }

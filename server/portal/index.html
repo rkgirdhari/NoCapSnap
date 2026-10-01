@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<title>Private feedback</title>
+<link rel="stylesheet" href="/g/portal.css">
+<script src="/g/portal.js" defer></script>
+</head>
+<body>
+<main>
+  <p class="wordmark">NO CAP SNAP</p>
+
+  <section id="loading" aria-live="polite"><p class="muted">Opening your invitation…</p></section>
+
+  <section id="gone" hidden>
+    <h1>This link is no longer available.</h1>
+    <p class="muted">It may have expired, or feedback for this plate was already sent. Thank you for your visit.</p>
+  </section>
+
+  <section id="offline" hidden>
+    <h1>We couldn't reach the restaurant.</h1>
+    <p class="muted">Check your connection, then try again.</p>
+    <button type="button" id="retry" class="primary">Try again</button>
+  </section>
+
+  <form id="form" hidden novalidate>
+    <h1>How was your dish?</h1>
+    <p class="dish"><span id="dish"></span><span id="place" class="place"></span></p>
+    <img id="photo" alt="The plate you were served" hidden>
+
+    <fieldset class="rating">
+      <legend>Your rating, from 1 (poor) to 5 (excellent)</legend>
+      <div class="scale">
+        <label><input type="radio" name="rating" value="1"><span>1</span></label>
+        <label><input type="radio" name="rating" value="2"><span>2</span></label>
+        <label><input type="radio" name="rating" value="3"><span>3</span></label>
+        <label><input type="radio" name="rating" value="4"><span>4</span></label>
+        <label><input type="radio" name="rating" value="5"><span>5</span></label>
+      </div>
+    </fieldset>
+
+    <label class="comment" for="comment">Anything the kitchen should know? (optional)</label>
+    <textarea id="comment" maxlength="2000" rows="4"></textarea>
+    <p class="count muted"><span id="count">0</span> / 2000</p>
+
+    <p id="error" class="error" role="alert" hidden></p>
+    <button type="submit" id="send" class="primary" disabled>Send privately</button>
+    <p class="muted small">Your answer goes only to the restaurant. We never ask for your name, email or phone number.</p>
+  </form>
+
+  <section id="thanks" hidden>
+    <h1>Thank you.</h1>
+    <p class="muted">Your feedback went straight to the kitchen.</p>
+  </section>
+</main>
+</body>
+</html>

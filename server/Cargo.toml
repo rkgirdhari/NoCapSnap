@@ -1,0 +1,38 @@
+[package]
+name = "capsnap-server"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "CapSnap server: staff API, media validation, guest feedback portal (Spec §5)"
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "tokio", "query", "matched-path"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs", "io-util", "time", "signal", "sync"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "migrate", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+argon2 = "0.6.0"
+getrandom = "0.4.3"
+sha2 = "0.10"
+base64 = "0.22"
+hex = "0.4.3"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std", "ansi"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+capsnap-onboard = { path = "../crates/capsnap-onboard" }
+
+[dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
+http-body-util = "0.1.5"
+tempfile = "3"
+capsnap-store = { path = "../crates/capsnap-store" }
+
+[profile.release]
+strip = "debuginfo"

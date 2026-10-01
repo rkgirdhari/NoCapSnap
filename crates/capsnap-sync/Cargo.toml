@@ -1,0 +1,27 @@
+[package]
+name = "capsnap-sync"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "CapSnap phone-side sync: sign-in, menu refresh and the outbox upload (W3a)"
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[dependencies]
+capsnap-store = { path = "../capsnap-store" }
+# Blocking HTTP with rustls (ring) and bundled Mozilla roots: no platform
+# certificate plumbing on Android. Called from blocking threads.
+ureq = { version = "3.4.2", default-features = false, features = ["rustls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
+capsnap-server = { path = "../../server" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tempfile = "3"
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio"] }

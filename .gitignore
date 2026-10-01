@@ -1,0 +1,14 @@
+# Build output
+node_modules
+target
+build
+.svelte-kit
+.DS_Store
+
+# Secrets — never commit
+.env
+.env.*
+*.jks
+*.keystore
+keystore.properties
+google-play-service-account.json

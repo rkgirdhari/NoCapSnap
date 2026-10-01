@@ -1,0 +1,123 @@
+#!/bin/sh
+# capsnap-release: switch the CapSnap server to a release, check its health, and switch
+# back if it fails. Only the binary changes; the data in /var/lib/capsnap is never touched.
+#
+#   capsnap-release activate /var/www/capsnap/releases/<UTC timestamp>-<id>
+#   capsnap-release rollback      back to the release that was current before
+#   capsnap-release status
+#
+# Installed as /usr/local/sbin/capsnap-release by install.sh. Run as root.
+set -eu
+
+ROOT=${CAPSNAP_ROOT:-/var/www/capsnap}
+ENV_FILE=${CAPSNAP_ENV_FILE:-/etc/capsnap/capsnap.env}
+KEEP=5
+
+die() { echo "capsnap-release: $*" >&2; exit 1; }
+
+health_url() {
+    bind=$(sed -n 's/^CAPSNAP_BIND=//p' "$ENV_FILE" | tail -n 1)
+    [ -n "$bind" ] || die "CAPSNAP_BIND is not set in $ENV_FILE"
+    echo "http://$bind/api/v1/health"
+}
+
+# Healthy = the unit is active and /api/v1/health answers ok, within 30 seconds.
+wait_healthy() {
+    url=$(health_url)
+    i=0
+    while [ "$i" -lt 30 ]; do
+        if systemctl is-active --quiet capsnap &&
+            curl -fsS --noproxy '*' --max-time 2 "$url" 2>/dev/null | grep -q '"status":"ok"'; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 1
+    done
+    return 1
+}
+
+# The release a link points at, or nothing if the link or its target is missing.
+target_of() {
+    if [ -L "$1" ] && [ -d "$1" ]; then readlink -f "$1"; fi
+}
+
+point_current_at() {
+    ln -sfn "$1" "$ROOT/current.new"
+    mv -Tf "$ROOT/current.new" "$ROOT/current"
+}
+
+# Keep the newest $KEEP releases, plus whatever current and previous point at.
+# Release names start with a UTC timestamp, so glob order is age order.
+prune() {
+    cur=$(target_of "$ROOT/current")
+    prev=$(target_of "$ROOT/previous")
+    set -- "$ROOT"/releases/*/
+    [ -d "$1" ] || return 0
+    excess=$(($# - KEEP))
+    for dir in "$@"; do
+        [ "$excess" -gt 0 ] || break
+        excess=$((excess - 1))
+        dir=${dir%/}
+        if [ "$dir" = "$cur" ] || [ "$dir" = "$prev" ]; then continue; fi
+        case "$dir" in
+            "$ROOT"/releases/?*) rm -rf -- "$dir" ;;
+        esac
+    done
+}
+
+switch_to() {
+    new=$1
+    old=$(target_of "$ROOT/current")
+    point_current_at "$new"
+    systemctl restart capsnap
+    if wait_healthy; then
+        if [ -n "$old" ] && [ "$old" != "$new" ]; then
+            ln -sfn "$old" "$ROOT/previous"
+        fi
+        prune
+        echo "capsnap-release: running $(basename "$new")"
+        return 0
+    fi
+    echo "capsnap-release: $(basename "$new") failed its health check" >&2
+    if [ -n "$old" ] && [ "$old" != "$new" ] && [ -x "$old/capsnap-server" ]; then
+        point_current_at "$old"
+        systemctl restart capsnap
+        if wait_healthy; then
+            echo "capsnap-release: switched back to $(basename "$old")" >&2
+        else
+            echo "capsnap-release: $(basename "$old") is not healthy either; see journalctl -u capsnap and journalctl --namespace=capsnap" >&2
+        fi
+    fi
+    return 1
+}
+
+[ "$(id -u)" -eq 0 ] || die "run as root"
+cmd=${1:-status}
+case "$cmd" in
+    activate)
+        [ $# -eq 2 ] || die "usage: capsnap-release activate $ROOT/releases/<id>"
+        new=$(readlink -f "$2") || die "no such release: $2"
+        case "$new" in
+            "$ROOT"/releases/?*) ;;
+            *) die "releases live under $ROOT/releases/" ;;
+        esac
+        [ -x "$new/capsnap-server" ] || die "$new/capsnap-server is missing or not executable"
+        switch_to "$new"
+        ;;
+    rollback)
+        prev=$(target_of "$ROOT/previous")
+        if [ -z "$prev" ] || [ ! -x "$prev/capsnap-server" ]; then die "there is no previous release"; fi
+        switch_to "$prev"
+        ;;
+    status)
+        cur=$(target_of "$ROOT/current")
+        prev=$(target_of "$ROOT/previous")
+        echo "current:  $(basename "${cur:-none}")"
+        echo "previous: $(basename "${prev:-none}")"
+        for dir in "$ROOT"/releases/*/; do
+            [ -d "$dir" ] && echo "release:  $(basename "$dir")"
+        done
+        if wait_healthy; then echo "health:   ok"; else echo "health:   FAILING"; exit 1; fi
+        ;;
+    *) die "unknown command: $cmd (activate, rollback, status)" ;;
+esac

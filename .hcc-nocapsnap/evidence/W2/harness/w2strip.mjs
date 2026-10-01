@@ -1,0 +1,11 @@
+import sharp from "sharp";
+const I = "$SCRATCH/w2/shots", O = "$REPO/nocapsnap/.hcc-nocapsnap/evidence/W2";
+const H = 1000, gap = 20;
+const files = ["00-home-empty.png", "05b-invite-pending.png", "08-camera-viewfinder.png", "06-insights.png"];
+const bufs = await Promise.all(files.map((f) => sharp(`${I}/${f}`).resize({ height: H }).toBuffer()));
+const widths = await Promise.all(bufs.map(async (b) => (await sharp(b).metadata()).width));
+let left = 0; const comp = [];
+bufs.forEach((b, i) => { comp.push({ input: b, left, top: 0 }); left += widths[i] + gap; });
+await sharp({ create: { width: left - gap, height: H, channels: 3, background: "#0b0410" } }).composite(comp).webp({ quality: 78 }).toFile(`${O}/06-other-screens.webp`);
+const s = await sharp(`${I}/07-settings-full.png`).resize({ width: 560 }).webp({ quality: 78 }).toFile(`${O}/07-settings-full.webp`);
+console.log("ok", s.width + "x" + s.height);
