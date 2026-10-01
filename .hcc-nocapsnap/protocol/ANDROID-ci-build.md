@@ -30,6 +30,7 @@ Decision needed from owner: none to merge. Later (W5): create the Play upload ke
 
 - no browser preview bridge in the bundled frontend;
 - `zipalign -P 16` and LOAD alignment `0x4000` (16 KB pages);
+- the native library is stripped (no symbol table);
 - an APK Signature Scheme v2 signature;
 - package `com.hammurabicoding.nocapsnap` at the app's version;
 - minSdk 24, targetSdk 36 or later, `arm64-v8a` only;
@@ -102,6 +103,22 @@ arm64-v8a/libcapsnap_app_lib.so: 10591744 bytes, LOAD align 0x4000
 - the preview bridge left in `build/`;
 - an upload key set but no `.aab` built;
 - a wrong key password.
+
+**First run on GitHub (run 36900350649, commit `878e257`):**
+
+- **Result:** green in 8 minutes, but the APK was 21,355,150 bytes against W3a's 12,343,950.
+- **Cause:** its `libcapsnap_app_lib.so` (19,605,568 bytes) still carried its symbol table: `.symtab` plus
+  `.strtab` were about 6.4 MB. The W3a library had none.
+- **What is not known:** why the local builds came out stripped is not established. A small test library built
+  locally with Rust 1.94 keeps `.symtab` by default, and CI ran Rust 1.99.
+- **Fix:**
+  - `app/src-tauri/Cargo.toml` now sets `[profile.release] strip = "symbols"`, so the result no longer depends on
+    the toolchain. On a test library built with NDK r30, this removes `.symtab` and keeps the exported symbols
+    Android loads.
+  - `package-android.sh` now fails if a library still has `.symtab`. Run against the first CI APK, it stops with
+    "still has its symbol table"; run against the W3a build, it passes.
+- **Still unexplained:** CI's `.text` section is also about 1.8 MB larger (8.8 MB against 7.1 MB), which is
+  consistent with the newer compiler. CI uses current stable Rust, like the other workflows.
 
 **The release step's logic, dry-run for both signing modes:**
 

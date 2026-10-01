@@ -88,6 +88,7 @@ for so in "$work"/apk/lib/*/*.so; do
   align="$(readelf -lW "$so" | awk '$1=="LOAD"{print $NF}' | sort -u | paste -sd' ')"
   echo "$(basename "$(dirname "$so")")/$(basename "$so"): $(stat -c %s "$so") bytes, LOAD align $align"
   [ "$align" = "0x4000" ] || fail "$(basename "$so") is not 16 KB-aligned"
+  if readelf -SW "$so" | grep -q " \.symtab "; then fail "$(basename "$so") still has its symbol table (not stripped)"; fi
 done
 
 # AAB, for Google Play: only with the upload key.

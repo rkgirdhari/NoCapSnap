@@ -16,6 +16,12 @@ license = "LicenseRef-HCC-Proprietary"
 name = "capsnap_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Release builds ship without a symbol table, whatever the toolchain's default: the first CI build of the APK kept
+# about 6 MB of symbols that the earlier local builds did not have. Exported (dynamic) symbols stay, so Android can
+# still load the library.
+[profile.release]
+strip = "symbols"
+
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
