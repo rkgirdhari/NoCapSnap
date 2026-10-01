@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/rkgirdhari/nocapsnap/actions/workflows/ci.yml/badge.svg)](https://github.com/rkgirdhari/nocapsnap/actions/workflows/ci.yml)
 [![Server and deploy kit](https://github.com/rkgirdhari/nocapsnap/actions/workflows/capsnap-server.yml/badge.svg)](https://github.com/rkgirdhari/nocapsnap/actions/workflows/capsnap-server.yml)
+[![Android](https://github.com/rkgirdhari/nocapsnap/actions/workflows/android.yml/badge.svg)](https://github.com/rkgirdhari/nocapsnap/actions/workflows/android.yml)
 · Proprietary, source visible ([LICENSE](LICENSE)) · [Security policy](SECURITY.md)
 
 Restaurant staff photograph the dish they prepared for a guest. The guest scans a QR code and tells the restaurant,
@@ -77,7 +78,7 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 ├── app/             # staff app: SvelteKit static SPA + Tauri 2 (Android)
 │   ├── src/         # UI — design language in src/app.css
 │   ├── src-tauri/   # Rust core + gen/android (Gradle project)
-│   └── scripts/build-android.sh
+│   └── scripts/     # build-android.sh (debug APK), package-android.sh (release signing + Play checks)
 ├── server/          # Axum + SQLite server: staff API, media checks, guest portal (/g/)
 ├── deploy/          # W3b: preflight, install, smoke test, release switching for the ZAP VPS
 └── crates/
@@ -96,6 +97,17 @@ VITE_CAPSNAP_PREVIEW=1 pnpm build && pnpm preview   # the same preview from a pr
 pnpm check          # svelte-check, warnings fail
 ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug APK + Play checks
 ```
+
+**Getting the APK:**
+
+- **From GitHub Actions.** The Android workflow (`.github/workflows/android.yml`) builds a release APK for every
+  change to the app. Download it from the run's `capsnap-android` artifact, which is kept for 30 days.
+- **From a GitHub Release.** Pushing a tag `vX.Y.Z` that matches the app version publishes the build there,
+  where it is kept permanently.
+- **Signing.** Until the Play upload key is added as repository secrets, builds are signed with a throwaway test
+  key, so uninstall the previous build before installing a new one.
+
+Details are in [the Android CI record](.hcc-nocapsnap/protocol/ANDROID-ci-build.md).
 
 Rust tests: `scripts/test-host.sh` in each of `crates/capsnap-store`, `crates/capsnap-sync`,
 `crates/capsnap-onboard` and `server`. The server README explains how to run it locally.

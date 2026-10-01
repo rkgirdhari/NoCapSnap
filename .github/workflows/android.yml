@@ -1,0 +1,142 @@
+# CapSnap for Android, built on GitHub so the APK no longer lives only on the machine that built it.
+#   every PR and push to main  release APK for arm64, checked as in the W1-W3a gate reports (16 KB alignment,
+#                              signature, Play manifest rules), kept as the "capsnap-android" artifact for 30 days
+#   tag vX.Y.Z (= app version) the same build, published as a GitHub Release, which keeps it permanently
+# Signing: with the ANDROID_UPLOAD_* repository secrets set, the APK and the Play bundle (.aab) are signed with the
+# Play upload key. Without them the APK is signed with a throwaway test key and no .aab is made
+# (see app/scripts/package-android.sh).
+name: Android
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "crates/capsnap-store/**"
+      - "crates/capsnap-sync/**"
+      - ".github/workflows/android.yml"
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "app/**"
+      - "crates/capsnap-store/**"
+      - "crates/capsnap-sync/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # The toolchain the W1-W3a APKs were built and checked with.
+      ANDROID_PLATFORM: "platforms;android-37.0"
+      BUILD_TOOLS: "36.1.0"
+      NDK_VERSION: "30.0.16248370"
+      HAS_UPLOAD_KEY: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p 'require("./app/src-tauri/tauri.conf.json").version')"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the app version $version (tauri.conf.json)"; exit 1
+          fi
+      - name: Toolchains
+        run: |
+          corepack enable
+          pnpm --version
+          rustup toolchain install stable --profile minimal --target aarch64-linux-android
+          rustup default stable
+      - name: Android SDK packages (pinned)
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "$ANDROID_PLATFORM" "build-tools;$BUILD_TOOLS" "ndk;$NDK_VERSION" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            app/src-tauri/target
+          key: android-${{ hashFiles('app/src-tauri/Cargo.lock', 'app/src-tauri/gen/android/**/*.kts', 'app/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Upload key (repository secrets)
+        if: env.HAS_UPLOAD_KEY == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+          echo "CAPSNAP_KEYSTORE=$RUNNER_TEMP/upload.keystore" >> "$GITHUB_ENV"
+      - name: Build (release, arm64)
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          formats=(--apk)
+          if [ "$HAS_UPLOAD_KEY" = "true" ]; then formats+=(--aab); fi
+          pnpm tauri android build "${formats[@]}" --target aarch64
+      - name: Sign, check and checksum
+        working-directory: app
+        env:
+          CAPSNAP_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          CAPSNAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          CAPSNAP_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: scripts/package-android.sh ../dist
+      - name: Remove the upload key from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.keystore"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capsnap-android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: android
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: capsnap-android
+          path: dist
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if compgen -G "dist/*.aab" > /dev/null; then
+            flags=()
+            about="Signed with the Play upload key. Upload the .aab to Google Play; the .apk installs directly on a phone."
+          else
+            flags=(--prerelease)
+            about="Test build, signed with a throwaway key (no upload key is set yet). Uninstall any other CapSnap build before installing this one."
+          fi
+          { echo "$about"; echo; echo "SHA-256:"; echo '```'; cat dist/SHA256SUMS.txt; echo '```'; } > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "CapSnap $GITHUB_REF_NAME" --notes-file notes.md "${flags[@]}"
