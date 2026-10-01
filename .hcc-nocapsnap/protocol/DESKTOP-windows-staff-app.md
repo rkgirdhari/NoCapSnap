@@ -8,8 +8,8 @@ packaging until mobile stability is verified") forward, before mobile has been v
 
 ```
 ## Gate Desktop — Windows build of the staff app
-Status: Specified until the first CI build; then Built (installers), Specified (running on the owner's PC)
-Evidence: .github/workflows/desktop.yml on a windows-2022 runner → .msi + setup .exe with SHA256SUMS
+Status: Built (installers); Specified (running on the owner's PC)
+Evidence: desktop.yml run 36887773722 on windows-2022, green in 8 min → .msi + setup .exe with SHA256SUMS
 Changes: desktop.yml (new); tauri.conf.json window opens centred, 412×860, resizable down to 360×560
 Tenth Man: the installers are unsigned, so Windows SmartScreen will warn; and the app has no server to sync with yet
 Decision needed from owner: none to build. Run the installer and report what you see
@@ -41,7 +41,7 @@ Decision needed from owner: none to build. Run the installer and report what you
 
 | Item | Label | Why |
 |---|---|---|
-| Windows installers built from this repo | **Specified** until the first green `desktop.yml` run, then **Built** | CI on a Windows runner |
+| Windows installers built from this repo | **Built** | `desktop.yml` run 36887773722 (commit `07b1873`), green; checksums re-verified after download |
 | The app running on the owner's Windows PC | **Specified** | Nobody has run it yet |
 | Webcam capture in WebView2 | **Specified** | Untested on Windows |
 | Code-signed installers (no SmartScreen warning) | **Aspirational** | Needs a code-signing certificate, which is a paid purchase |
@@ -54,3 +54,14 @@ Decision needed from owner: none to build. Run the installer and report what you
 - **Unsigned installers.** Windows will say "Windows protected your PC". Click **More info → Run anyway**. Fine for the
   owner; not acceptable for customers.
 - **The UI is phone-shaped.** It runs in a narrow window. A layout designed for desktop is not part of this.
+
+## First build (2026-10-01)
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `CapSnap_0.1.0_x64-setup.exe` | 4.3 MB | `148c42a3e8efae6136f4ba974283785b1f720a7f053b6ebfa287a26bbe174a33` |
+| `CapSnap_0.1.0_x64_en-US.msi` | 6.1 MB | `24333c1466809cebbcecdad0ba3a6db6f79ad2f988cbed1618c9978283a4d368` |
+
+- The run's other checks were all green: the Rust crates, the app UI and Rust shell, and the dependency audit.
+- No browser-preview code was found in the release build.
+- The setup .exe was sent to the owner on 2026-10-01. The run keeps both files for 30 days.
