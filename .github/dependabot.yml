@@ -7,6 +7,11 @@ updates:
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     groups:
+      # The crates depend on each other by path but each keeps its own Cargo.lock, so a major update has to
+      # change every lockfile at once: one PR per dependency, across all five directories.
+      rust-major:
+        update-types: [major]
+        group-by: dependency-name
       rust-minor-and-patch:
         update-types: [minor, patch]
   - package-ecosystem: npm
@@ -19,3 +24,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      # Workflow actions, majors included, in one PR: CI on that PR runs every workflow they appear in.
+      github-actions:
+        patterns: ["*"]
