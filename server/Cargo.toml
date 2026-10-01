@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false
+license = "LicenseRef-HCC-Proprietary"
 description = "CapSnap server: staff API, media validation, guest feedback portal (Spec §5)"
 
 # Standalone: keep this out of the repo-root Cargo workspace.

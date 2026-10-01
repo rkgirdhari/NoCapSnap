@@ -6,6 +6,7 @@ authors = ["Hammurabi Coding Company LLC"]
 edition = "2024"
 rust-version = "1.94"
 publish = false
+license = "LicenseRef-HCC-Proprietary"
 
 # Standalone: keep this out of the repo-root Cargo workspace.
 [workspace]

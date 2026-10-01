@@ -1,13 +1,51 @@
-# CapSnap (nocapsnap)
+# CapSnap
 
-Private, dish-level guest feedback for restaurants.
-**Hammurabi Coding Company LLC** · Founder: **R. K. Girdhari** ·
-Android package `com.hammurabicoding.nocapsnap`
+**Private, dish-level guest feedback for restaurants.**
 
-The owner specification is the source of truth:
+[![CI](https://github.com/rkgirdhari/nocapsnap/actions/workflows/ci.yml/badge.svg)](https://github.com/rkgirdhari/nocapsnap/actions/workflows/ci.yml)
+[![Server and deploy kit](https://github.com/rkgirdhari/nocapsnap/actions/workflows/capsnap-server.yml/badge.svg)](https://github.com/rkgirdhari/nocapsnap/actions/workflows/capsnap-server.yml)
+· Proprietary, source visible ([LICENSE](LICENSE)) · [Security policy](SECURITY.md)
+
+Restaurant staff photograph the dish they prepared for a guest. The guest scans a QR code and tells the restaurant,
+privately, what they thought of that exact plate: a 1–5 rating and an optional comment. The restaurant uses it for
+internal quality control.
+
+- No app and no account for the guest.
+- Nothing is posted publicly, and negative answers are never filtered out or redirected to review sites.
+
+> **Status: pre-release.** CapSnap is built in reviewed stages ("gates", below). The server and guest page are built
+> and tested; the Android app has not yet been released to the Play Store, and iOS is planned.
+
+## How it works
+
+1. **Staff app** (Android; iOS planned):
+   - choose the dish and take the photo;
+   - the photo is saved on the phone first, so a bad signal never loses it;
+   - it syncs in the background.
+2. **Server** (self-hosted, Rust):
+   - checks that the photo is a clean image with no hidden metadata;
+   - stores it and issues a one-use guest link, shown as a QR code.
+3. **Guest page:**
+   - the guest scans the code and rates the dish;
+   - every guest sees the same neutral form, whatever their answer;
+   - the feedback is stored privately for the restaurant. *(A staff screen for reading it is not built yet.)*
+
+## Principles
+
+- **Privacy first.**
+  - No guest names, emails or phone numbers.
+  - No third-party trackers, fonts or analytics.
+  - Fixed retention: photos 30 days after sync, feedback 12 months, logs 30 days.
+- **Self-hosted.** One Rust binary with SQLite, behind nginx. No cloud services.
+- **Offline first.** The staff app works without a connection and catches up later.
+- **Evidence over claims.** Every claim is labelled **Built**, **Specified** or **Aspirational**, and every stage
+  ends with a written report that argues against itself.
+
+**Hammurabi Coding Company LLC** · Founder **R. K. Girdhari** · Android package `com.hammurabicoding.nocapsnap`.
+
+The owner's specification is the source of truth:
 [`.hcc-nocapsnap/spec/SPEC-v1-operations-technical.md`](.hcc-nocapsnap/spec/SPEC-v1-operations-technical.md).
-Target stack: Tauri 2 + SvelteKit (static SPA) on Android, Rust/Axum + SQLite
-server, self-hosted, no cloud services.
+Stack: Tauri 2 + SvelteKit (static SPA) on Android; Rust/Axum + SQLite on the server.
 
 ## Work runs in gates
 
@@ -75,4 +113,12 @@ The earlier Expo / Express / S3 prototype was removed per owner decision D2
 CapSnap was built under `nocapsnap/` in `rkgirdhari/software` (PR #1, gates W0 to W3b) and
 moved here on 2026-10-01 at the owner's request, with its history (`git subtree split`).
 Gate reports written before the move cite paths with a `nocapsnap/` prefix; drop it to find
-the file here. Reports are records, so they were not rewritten.
+the file here. Reports are records, so they were not rewritten, except where text is marked "redacted for
+publication": details of the host's other services were removed before the repository went public.
+
+## License and security
+
+Proprietary: © 2026 Hammurabi Coding Company LLC, all rights reserved. The source is public to read. See
+[LICENSE](LICENSE) for what that does and doesn't allow, and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Found a vulnerability? Please report it privately, as described in [SECURITY.md](SECURITY.md).

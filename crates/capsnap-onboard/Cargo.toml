@@ -4,6 +4,7 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false
+license = "LicenseRef-HCC-Proprietary"
 description = "CapSnap onboarding import: consent-based read of a restaurant's own website into a draft (ONB-1)"
 
 # Standalone: keep this out of the repo-root Cargo workspace.
