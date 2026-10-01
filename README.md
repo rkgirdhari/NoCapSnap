@@ -102,8 +102,10 @@ ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug A
 
 - **From GitHub Actions.** The Android workflow (`.github/workflows/android.yml`) builds a release APK for every
   change to the app. Download it from the run's `capsnap-android` artifact, which is kept for 30 days.
-- **From a GitHub Release.** Pushing a tag `vX.Y.Z` that matches the app version publishes the build there,
-  where it is kept permanently.
+- **From a GitHub Release,** where it is kept permanently. Two ways to publish one:
+  - push a tag `vX.Y.Z` that matches the app version;
+  - or run the Android workflow by hand on `main` (Actions → Android → Run workflow) with "publish a release"
+    ticked. GitHub then creates the tag `v<app version>` itself.
 - **Signing.** Until the Play upload key is added as repository secrets, builds are signed with a throwaway test
   key, so uninstall the previous build before installing a new one.
 
