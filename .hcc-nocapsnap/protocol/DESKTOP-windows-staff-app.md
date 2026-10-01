@@ -45,7 +45,7 @@ Decision needed from owner: none to build. Run the installer and report what you
 | The app running on the owner's Windows PC | **Specified** | Nobody has run it yet |
 | Webcam capture in WebView2 | **Specified** | Untested on Windows |
 | Code-signed installers (no SmartScreen warning) | **Aspirational** | Needs a code-signing certificate, which is a paid purchase |
-| Installers in the GitHub Release | **Specified** until the first run | Owner asked on 2026-10-01 ("add the windows installers to the release too"). `desktop.yml` publishes to release `v<app version>` on a tag push or a manual run with "publish a release"; for an existing tag it builds that tag's commit. The shared publish script and the source step were dry-run locally |
+| Installers in the GitHub Release | **Built** | [v0.1.0](https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0): run 36935551388, a manual run on `main` with "publish a release". Its log reads "Release v0.1.0 exists: building its commit bfa5cf0". It added the `.msi`, setup `.exe` and `SHA256SUMS-windows.txt`, plus a Windows section in the notes. The APK and `SHA256SUMS.txt` were left unchanged. All files were re-downloaded and their checksums match |
 
 ## Tenth Man
 
@@ -66,3 +66,16 @@ Decision needed from owner: none to build. Run the installer and report what you
 - The run's other checks were all green: the Rust crates, the app UI and Rust shell, and the dependency audit.
 - No browser-preview code was found in the release build.
 - The setup .exe was sent to the owner on 2026-10-01. The run keeps both files for 30 days; a GitHub Release keeps them permanently (see Labels).
+
+## In release v0.1.0 (2026-10-01)
+
+Built from tag `v0.1.0`'s commit `bfa5cf0`, the same source as the release's APK:
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `CapSnap_0.1.0_x64-setup.exe` | 4,306,132 bytes | `d91cf42b8db55ad1c184eb21cd860846d86740008cdb5777c233abd1f486557d` |
+| `CapSnap_0.1.0_x64_en-US.msi` | 6,107,136 bytes | `7600e300473ffed85cee369870a892191fca5681cc965dd1b9a5a3499a6cf4f1` |
+
+- These differ from the first build's checksums because the installers record build-time data. The app source is the same.
+- `SHA256SUMS-windows.txt` has Windows line endings. GNU `sha256sum -c` accepts it as it is.
+- The release's setup .exe was sent to the owner on 2026-10-01.
