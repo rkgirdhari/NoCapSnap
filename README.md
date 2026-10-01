@@ -21,7 +21,7 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 | W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
 | W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
 | W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Approved (device check D9 still open) |
-| W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Open; deploy kit in progress. G1 (domain) still needed |
+| W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Open; kit built and rehearsed. G1 = nocapsnap.hammurabi.click; waiting on DNS + preflight |
 
 ## Layout
 

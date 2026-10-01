@@ -199,7 +199,7 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
 
 ## Decisions needed from owner
 
-- **G1: the guest domain.** It is needed to go live.
+- ~~**G1: the guest domain.**~~ Answered: `nocapsnap.hammurabi.click` (see "Owner decisions" below).
 - **Run `preflight.sh` on the box and send the output.** Step 1 of the runbook. Once G1 is chosen, run it with the
   domain.
 - **For the deploy job (optional now):**
@@ -208,3 +208,25 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
   - optionally, a `capsnap-production` environment with you as required reviewer.
 - **D9: still open.** The first real capture from a phone becomes part of W3b's live check.
 - **Optional:** a restricted deploy user (Tenth Man, third point).
+
+## Owner decisions (2026-10-01)
+
+- **G1: `nocapsnap.hammurabi.click`.** It moves to the VPS. The owner chose this over a new subdomain, knowing that
+  the Manus page there goes offline.
+- **The Manus "Guest ordering" page is marketing or demo only.** It is not CapSnap's guest site, so the spec doesn't
+  apply to it, and its ordering flow and `manus-analytics.com` script stay out of CapSnap.
+- **Repository:** CapSnap moves to `rkgirdhari/nocapsnap` with its history, **after** that repo is made private. As of
+  this entry the repo is still public, and nothing has been pushed to it.
+
+**What G1 means for going live** (observed 2026-10-01, read-only from outside):
+
+- The hostname currently resolves to Cloudflare, which serves the Manus site. Every path, including
+  `/api/v1/health` and `/g/`, returns the Manus page.
+- The DNS record must become an **A record to the VPS with Cloudflare's proxy off** (DNS only). Otherwise:
+  - Let's Encrypt's http check can't reach nginx on the box;
+  - preflight's DNS check can't match the box;
+  - `smoke.sh` would be testing Cloudflare, not the server.
+- The current site sends `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`. Browsers that
+  visited it will insist on https for this name, which CapSnap already serves. Nothing to do.
+- **Order:** change DNS → `preflight.sh nocapsnap.hammurabi.click` shows "DNS: … points at this box" →
+  `install.sh --domain nocapsnap.hammurabi.click` → `smoke.sh` from outside.
