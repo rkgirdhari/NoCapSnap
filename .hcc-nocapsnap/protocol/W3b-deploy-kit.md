@@ -99,7 +99,17 @@ The outside-in checks in `smoke.sh`:
 2. **Local health checks could go through a proxy.** Wherever `https_proxy` is set, `curl` sent the check for
    `https://<domain>` through the proxy (a 502 here). `install.sh` and `capsnap-release` now use `--noproxy '*'`.
 3. **Rolling back past a migration would fail**, as described above.
-4. **Hazard seen, not a bug:** Ubuntu's stock nginx site listens on `[::]:80` and fails `nginx -t` on a machine
+4. **A refused upload could reach the client as 502 instead of 401.** The server answered "no session" before
+   reading the photo and closed the connection; nginx, still sending the buffered body, logged `sendfile() failed
+   (32: Broken pipe) while sending request to upstream` and answered 502. The CI rehearsal hit it once, on a
+   docs-only commit, after three green runs. It was reproduced locally (10 of 30 parallel 9 MiB uploads came back
+   502).
+   - Impact: a phone whose session had expired would have kept retrying a "server error" instead of signing out.
+   - Fix: `POST /media` now reads the rest of the body (at most 10 MiB, 30 s) before any early refusal: no
+     session, wrong type, or missing checksum.
+   - Test: `tests/upload_refusal.rs` failed 3 of 3 before the fix and passes after.
+   - Local stress after the fix: 90 of 90 return 401, with no new nginx upstream errors.
+5. **Hazard seen, not a bug:** Ubuntu's stock nginx site listens on `[::]:80` and fails `nginx -t` on a machine
    without IPv6. `install.sh` writes `[::]` listeners only when the box has IPv6, and `preflight.sh` fails if
    `nginx -t` already fails before CapSnap is added.
 

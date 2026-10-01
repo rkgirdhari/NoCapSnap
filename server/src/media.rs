@@ -34,32 +34,19 @@ pub fn storage_path(media_dir: &Path, storage_key: &str) -> PathBuf {
 
 pub async fn upload(
     State(state): State<AppState>,
-    staff: Staff,
+    staff: Result<Staff, ApiError>,
     headers: HeaderMap,
     body: Body,
 ) -> ApiResult<(StatusCode, Json<MediaView>)> {
-    let content_type = headers
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if content_type.split(';').next().map(str::trim) != Some("image/jpeg") {
-        return Err(ApiError::new(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "unsupported_type",
-            "only image/jpeg is accepted",
-        ));
-    }
-    let declared = headers
-        .get("x-content-sha256")
-        .and_then(|v| v.to_str().ok())
-        .filter(|v| v.len() == 64 && v.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
-        .ok_or_else(|| {
-            ApiError::bad_request(
-                "missing_digest",
-                "send the photo's SHA-256 in X-Content-SHA256",
-            )
-        })?
-        .to_owned();
+    let (staff, declared) = match staff.and_then(|staff| Ok((staff, declared_digest(&headers)?))) {
+        Ok(v) => v,
+        Err(e) => {
+            // Read what the client is sending before refusing. Closing with the body
+            // half-sent makes nginx answer 502 instead of this status.
+            drain(body, state.cfg.max_media_bytes).await;
+            return Err(e);
+        }
+    };
 
     // Stream to a temporary file, counting and hashing as it arrives.
     let incoming = state.cfg.media_dir.join(".incoming");
@@ -114,6 +101,47 @@ pub async fn upload(
     .await;
     let _ = tokio::fs::remove_file(&tmp).await; // no-op after a successful rename
     outcome
+}
+
+/// The upload's declared SHA-256, once the content type is checked.
+fn declared_digest(headers: &HeaderMap) -> ApiResult<String> {
+    let content_type = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if content_type.split(';').next().map(str::trim) != Some("image/jpeg") {
+        return Err(ApiError::new(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "unsupported_type",
+            "only image/jpeg is accepted",
+        ));
+    }
+    headers
+        .get("x-content-sha256")
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| v.len() == 64 && v.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "missing_digest",
+                "send the photo's SHA-256 in X-Content-SHA256",
+            )
+        })
+}
+
+/// Reads and discards a request body: at most `max` bytes, for at most 30 seconds.
+async fn drain(body: Body, max: usize) {
+    let read = async {
+        let mut stream = body.into_data_stream();
+        let mut total = 0usize;
+        while let Some(Ok(chunk)) = stream.next().await {
+            total += chunk.len();
+            if total > max {
+                break;
+            }
+        }
+    };
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(30), read).await;
 }
 
 async fn receive(body: Body, tmp: &Path, max: usize) -> ApiResult<(String, usize)> {
