@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 TARGETS=("$@")
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(aarch64)
 
-# The repo-root .cargo/config.toml (HMS Forge) routes rustc through sccache.
+# Ignore any rustc wrapper (e.g. sccache) a parent or user cargo config may set.
 export RUSTC_WRAPPER=""
 export CI=true
 

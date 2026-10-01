@@ -32,7 +32,7 @@ The server listens on `127.0.0.1:8090` only. Don't open that port in `ufw`.
    contains no passwords, keys or IP addresses.
 
    ```bash
-   scp -r nocapsnap/deploy root@<box>:/root/capsnap-deploy
+   scp -r deploy root@<box>:/root/capsnap-deploy
    ssh root@<box> /root/capsnap-deploy/preflight.sh            # later: preflight.sh <domain>
    ```
 

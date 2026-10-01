@@ -1,5 +1,5 @@
 # CapSnap server: staff API and guest feedback portal (W3b).
-# Installed by nocapsnap/deploy/install.sh as /etc/systemd/system/capsnap.service.
+# Installed by deploy/install.sh as /etc/systemd/system/capsnap.service.
 # Only nginx faces the internet; the server listens on CAPSNAP_BIND (127.0.0.1).
 
 [Unit]

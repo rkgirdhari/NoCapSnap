@@ -1,0 +1,241 @@
+# CapSnap server: tests, a static x86_64 build, a full rehearsal of the
+# deploy kit on a real systemd + nginx machine, and (only when run by hand from main)
+# a deploy to the ZAP VPS. W3b; see deploy/README.md.
+name: CapSnap server
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - "crates/capsnap-onboard/**"
+      - "crates/capsnap-store/**"
+      - "deploy/**"
+      - ".github/workflows/capsnap-server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "crates/capsnap-onboard/**"
+      - "crates/capsnap-store/**"
+      - "deploy/**"
+      - ".github/workflows/capsnap-server.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy this build to the VPS (main only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capsnap-server-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  test:
+    name: Test (fmt, clippy, tests, scripts)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            server/target
+            crates/capsnap-onboard/target
+          key: capsnap-test-${{ hashFiles('server/Cargo.lock', 'crates/capsnap-onboard/Cargo.lock') }}
+      - name: Server
+        working-directory: server
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: ONB-1 import crate (used by the server)
+        working-directory: crates/capsnap-onboard
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Deploy scripts
+        run: |
+          command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }
+          shellcheck deploy/*.sh
+          shellcheck -s sh deploy/bin/*
+
+  build:
+    name: Build (static x86_64 musl)
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q musl-tools
+          rustup toolchain install stable --profile minimal --target x86_64-unknown-linux-musl
+          rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            server/target
+          key: capsnap-musl-${{ hashFiles('server/Cargo.lock') }}
+      - name: Build
+        working-directory: server
+        run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          mkdir dist
+          cp server/target/x86_64-unknown-linux-musl/release/capsnap-server dist/
+          file dist/capsnap-server | tee /dev/stderr | grep -q 'static'
+          ./dist/capsnap-server version
+          (cd dist && sha256sum capsnap-server > capsnap-server.sha256 && cat capsnap-server.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capsnap-server-x86_64-linux-musl
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  # The deploy kit, end to end, on the runner itself: a real systemd (the unit's
+  # sandboxing, the journald namespace) and a real nginx, with a test certificate.
+  kit:
+    name: Deploy kit rehearsal (systemd + nginx)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: capsnap-server-x86_64-linux-musl
+          path: dist
+      - name: A box like the VPS
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q nginx
+          sudo systemctl start nginx
+          # A test CA the machine trusts, and a certificate for capsnap.test from it.
+          mkdir ca && cd ca
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.pem -days 30 -subj "/CN=CapSnap CI test CA"
+          openssl req -newkey rsa:2048 -nodes -keyout site.key -out site.csr -subj "/CN=capsnap.test"
+          printf 'subjectAltName=DNS:capsnap.test\nextendedKeyUsage=serverAuth\n' > ext.cnf
+          openssl x509 -req -in site.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out site.pem -days 30 -extfile ext.cnf
+          cat site.pem ca.pem > fullchain.pem
+          sudo cp ca.pem /usr/local/share/ca-certificates/capsnap-ci.crt && sudo update-ca-certificates
+          # capsnap.test resolves to the runner's own non-loopback address, so the smoke
+          # test's "port 8090 is not reachable" check is real.
+          echo "$(hostname -I | awk '{print $1}') capsnap.test" | sudo tee -a /etc/hosts
+      - name: Preflight
+        run: sudo deploy/preflight.sh capsnap.test
+      - name: Install
+        run: |
+          chmod +x dist/capsnap-server
+          sudo deploy/install.sh --domain capsnap.test --binary dist/capsnap-server \
+            --tls-cert "$PWD/ca/fullchain.pem" --tls-key "$PWD/ca/site.key"
+      - name: Smoke test
+        run: deploy/smoke.sh capsnap.test
+      - name: The unit, its sandbox and its logs
+        run: |
+          sudo systemd-analyze verify /etc/systemd/system/capsnap.service
+          systemctl show capsnap -p ActiveState -p User -p LogNamespace -p StateDirectory
+          sudo systemd-analyze security capsnap.service | tail -n 1
+          sudo stat -c '%U:%G %a %n' /var/lib/capsnap /etc/capsnap/capsnap.env
+          sudo journalctl --namespace=capsnap --no-pager -n 5 -o cat
+          sudo journalctl --namespace=capsnap --no-pager -o cat | grep -q 'listening'
+      - name: Admin commands
+        run: |
+          sudo capsnapctl create-org ci "CI Bistro"
+          sudo capsnapctl create-location ci "CI Bistro" Europe/Berlin
+      - name: A release that fails is rolled back
+        run: |
+          bad=/var/www/capsnap/releases/20000101000000-broken
+          sudo install -d "$bad"
+          printf '#!/bin/sh\nexit 1\n' | sudo tee "$bad/capsnap-server" >/dev/null
+          sudo chmod 755 "$bad/capsnap-server"
+          if sudo capsnap-release activate "$bad"; then echo "::error::a broken release was accepted"; exit 1; fi
+          sudo capsnap-release status
+          deploy/smoke.sh capsnap.test
+      - name: Re-running install changes nothing
+        run: |
+          count() { find /var/www/capsnap/releases -mindepth 1 -maxdepth 1 -type d | wc -l; }
+          before=$(count)
+          sudo deploy/install.sh --domain capsnap.test --binary dist/capsnap-server \
+            --tls-cert "$PWD/ca/fullchain.pem" --tls-key "$PWD/ca/site.key"
+          test "$(count)" = "$before"
+      - name: Server output on failure
+        if: failure()
+        run: |
+          sudo journalctl -u capsnap --no-pager -n 50 || true
+          sudo journalctl --namespace=capsnap --no-pager -n 50 || true
+          sudo nginx -T 2>/dev/null | sed -n '/capsnap/,$p' | head -n 80 || true
+
+  # Manual only: Actions → CapSnap server → Run workflow on main, with "deploy" ticked.
+  # The first install on the box is install.sh by hand; this only ships new releases.
+  #
+  # Secrets (the ZAP docs' names): VPS_HOST, VPS_PORT, VPS_USER, VPS_DEPLOY_KEY, plus
+  # VPS_KNOWN_HOSTS: the box's host key line, checked against its own fingerprint.
+  # Variable: CAPSNAP_DOMAIN (G1).
+  deploy:
+    name: Deploy to the VPS
+    needs: [build, kit]
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: capsnap-production
+    concurrency:
+      group: capsnap-deploy
+      cancel-in-progress: false
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      CAPSNAP_DOMAIN: ${{ vars.CAPSNAP_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy
+      - uses: actions/download-artifact@v4
+        with:
+          name: capsnap-server-x86_64-linux-musl
+          path: dist
+      - name: Check the artifact
+        run: cd dist && sha256sum -c capsnap-server.sha256
+      - name: SSH, with the host key pinned
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          for v in VPS_HOST VPS_PORT VPS_USER CAPSNAP_DOMAIN DEPLOY_KEY KNOWN_HOSTS; do
+            test -n "${!v}" || { echo "::error::$v is not set (see the comment above this job)"; exit 1; }
+          done
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload and activate
+        run: |
+          release="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::12}"
+          dir="/var/www/capsnap/releases/$release"
+          opts=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes)
+          sudo_=""; [ "$VPS_USER" = root ] || sudo_="sudo -n"
+          remote() { ssh "${opts[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"; }
+          remote "command -v capsnap-release >/dev/null" ||
+            { echo "::error::capsnap-release is not on the box; run install.sh there first"; exit 1; }
+          remote "$sudo_ install -d -m 0755 $dir && $sudo_ install -m 0755 /dev/stdin $dir/capsnap-server" < dist/capsnap-server
+          remote "$sudo_ capsnap-release activate $dir"
+      - name: Smoke test from outside
+        run: bash deploy/smoke.sh "$CAPSNAP_DOMAIN"
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

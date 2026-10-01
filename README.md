@@ -26,7 +26,8 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 ## Layout
 
 ```
-nocapsnap/
+.
+├── .github/workflows/capsnap-server.yml   # server CI + deploy kit rehearsal
 ├── .hcc-nocapsnap/
 │   ├── spec/        # owner spec (verbatim)
 │   ├── protocol/    # gate reports W0, W1, …
@@ -48,7 +49,7 @@ nocapsnap/
 ## Staff app (`app/`)
 
 ```bash
-cd nocapsnap/app
+cd app
 corepack enable && pnpm install
 pnpm dev            # browser preview at http://127.0.0.1:1420 (in-memory, nothing saved)
 VITE_CAPSNAP_PREVIEW=1 pnpm build && pnpm preview   # the same preview from a production build
@@ -62,8 +63,15 @@ CI (`.github/workflows/capsnap-server.yml`) tests the server, builds a static x8
 and rehearses the deploy kit on a real systemd + nginx runner; `deploy/README.md` is the runbook.
 A plain `pnpm build` (what Tauri bundles) leaves the browser preview out.
 
-The repo-root `.cargo/config.toml` belongs to HMS Forge and expects `sccache`
-and `mold`; the CapSnap scripts switch those off (`RUSTC_WRAPPER=`).
+The test scripts clear `RUSTC_WRAPPER` and `CARGO_ENCODED_RUSTFLAGS`, so a user or parent
+cargo config that asks for `sccache` or `mold` doesn't break the build.
 
 The earlier Expo / Express / S3 prototype was removed per owner decision D2
-(W0). It remains in git history; the last commit containing it is `7604304`.
+(W0). It remains in the history of `rkgirdhari/software` (last in commit `7604304`).
+
+## Where this came from
+
+CapSnap was built under `nocapsnap/` in `rkgirdhari/software` (PR #1, gates W0 to W3b) and
+moved here on 2026-10-01 at the owner's request, with its history (`git subtree split`).
+Gate reports written before the move cite paths with a `nocapsnap/` prefix; drop it to find
+the file here. Reports are records, so they were not rewritten.
