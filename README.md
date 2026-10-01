@@ -98,14 +98,17 @@ pnpm check          # svelte-check, warnings fail
 ANDROID_HOME=… NDK_HOME=… JAVA_HOME=… scripts/build-android.sh   # debug APK + Play checks
 ```
 
-**Getting the APK:**
+**Getting the APK and the Windows installers:**
 
 - **From GitHub Actions.** The Android workflow (`.github/workflows/android.yml`) builds a release APK for every
-  change to the app. Download it from the run's `capsnap-android` artifact, which is kept for 30 days.
-- **From a GitHub Release,** where it is kept permanently. Two ways to publish one:
-  - push a tag `vX.Y.Z` that matches the app version;
-  - or run the Android workflow by hand on `main` (Actions → Android → Run workflow) with "publish a release"
-    ticked. GitHub then creates the tag `v<app version>` itself.
+  change to the app. Download it from the run's `capsnap-android` artifact, which is kept for 30 days. The Desktop
+  workflow (`desktop.yml`) does the same for the Windows installers (`capsnap-windows`).
+- **From a GitHub Release,** where they are kept permanently. Both workflows publish to the same release,
+  `v<app version>`. Two ways to publish one:
+  - push a tag `vX.Y.Z` that matches the app version (both workflows run);
+  - or run each workflow by hand on `main` (Actions → Android / Desktop → Run workflow) with "publish a release"
+    ticked. GitHub creates the tag `v<app version>` if it doesn't exist yet. If it does, that tag's commit is built
+    and the files are added to its release.
 - **Signing.** Until the Play upload key is added as repository secrets, builds are signed with a throwaway test
   key, so uninstall the previous build before installing a new one.
 

@@ -2,8 +2,10 @@
 #   every PR and push to main  release APK for arm64, checked as in the W1-W3a gate reports (16 KB alignment,
 #                              signature, Play manifest rules), kept as the "capsnap-android" artifact for 30 days
 #   tag vX.Y.Z (= app version) the same build, published as a GitHub Release, which keeps it permanently
-#   manual run on main with    the same, for when a tag can't be pushed: GitHub creates tag v<app version> on the
-#     "publish a release" on   commit that was built (Actions → Android → Run workflow)
+#   manual run on main with    the same, for when a tag can't be pushed (Actions → Android → Run workflow): if tag
+#     "publish a release"      v<app version> exists, its commit is built and the APK is added to that release;
+#                              otherwise main is built and GitHub creates the tag on it
+#   The Windows workflow (desktop.yml) publishes its installers to the same release; .github/scripts/publish-release.sh
 # Signing: with the ANDROID_UPLOAD_* repository secrets set, the APK and the Play bundle (.aab) are signed with the
 # Play upload key. Without them the APK is signed with a throwaway test key and no .aab is made
 # (see app/scripts/package-android.sh).
@@ -48,6 +50,7 @@ jobs:
     timeout-minutes: 60
     outputs:
       release_tag: ${{ steps.version.outputs.tag }}
+      release_sha: ${{ steps.version.outputs.sha }}
     env:
       # The toolchain the W1-W3a APKs were built and checked with.
       ANDROID_PLATFORM: "platforms;android-37.0"
@@ -63,14 +66,27 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: App version (a release tag must match it)
+      - name: Release source
         id: version
+        shell: bash
+        env:
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main' }}
         run: |
-          version="$(node -p 'require("./app/src-tauri/tauri.conf.json").version')"
-          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match the app version $version (tauri.conf.json)"; exit 1
+          # A tag push builds the tag, which must equal the app version. A manual release run builds release
+          # v<app version>: from that tag's commit if the tag exists (so files added to it match), else from main.
+          version() { node -p 'require("./app/src-tauri/tauri.conf.json").version'; }
+          tag="v$(version)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match the app version ${tag#v} (tauri.conf.json)"; exit 1
+            fi
+          elif [ "$RELEASE" = true ] && git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            git fetch --quiet --depth 1 origin "refs/tags/$tag:refs/tags/$tag"
+            git checkout --quiet --detach "$tag"
+            if [ "v$(version)" != "$tag" ]; then echo "::error::tag $tag holds app version $(version)"; exit 1; fi
+            echo "Release $tag exists: building its commit $(git rev-parse --short HEAD)"
           fi
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          { echo "tag=$tag"; echo "sha=$(git rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
       - name: Toolchains
         run: |
           corepack enable
@@ -134,6 +150,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
       - uses: actions/download-artifact@v8
         with:
           name: capsnap-android
@@ -142,23 +161,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.android.outputs.release_tag }}
+          TARGET_SHA: ${{ needs.android.outputs.release_sha }}
         run: |
           if compgen -G "dist/*.aab" > /dev/null; then
-            flags=()
+            prerelease=false
             about="Signed with the Play upload key. Upload the .aab to Google Play; the .apk installs directly on a phone."
           else
-            flags=(--prerelease)
+            prerelease=true
             about="Test build, signed with a throwaway key (no upload key is set yet). Uninstall any other CapSnap build before installing this one."
           fi
-          { echo "$about"; echo; echo "SHA-256:"; echo '```'; cat dist/SHA256SUMS.txt; echo '```'; } > notes.md
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            # Made by hand (GitHub → Releases → Draft a new release creates the tag too): attach this build to it.
-            gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] &&
-               gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" > /dev/null 2>&1; then
-            echo "::error::tag $TAG already exists on another commit; raise the version in tauri.conf.json first"; exit 1
-          else
-            # On a manual run the tag doesn't exist yet: GitHub creates it on the commit that was built.
-            gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "CapSnap $TAG" --notes-file notes.md "${flags[@]}"
-          fi
+          .github/scripts/publish-release.sh Android "$about" "$prerelease" dist

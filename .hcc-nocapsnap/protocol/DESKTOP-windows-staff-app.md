@@ -45,6 +45,7 @@ Decision needed from owner: none to build. Run the installer and report what you
 | The app running on the owner's Windows PC | **Specified** | Nobody has run it yet |
 | Webcam capture in WebView2 | **Specified** | Untested on Windows |
 | Code-signed installers (no SmartScreen warning) | **Aspirational** | Needs a code-signing certificate, which is a paid purchase |
+| Installers in the GitHub Release | **Specified** until the first run | Owner asked on 2026-10-01 ("add the windows installers to the release too"). `desktop.yml` publishes to release `v<app version>` on a tag push or a manual run with "publish a release"; for an existing tag it builds that tag's commit. The shared publish script and the source step were dry-run locally |
 
 ## Tenth Man
 
@@ -64,4 +65,4 @@ Decision needed from owner: none to build. Run the installer and report what you
 
 - The run's other checks were all green: the Rust crates, the app UI and Rust shell, and the dependency audit.
 - No browser-preview code was found in the release build.
-- The setup .exe was sent to the owner on 2026-10-01. The run keeps both files for 30 days.
+- The setup .exe was sent to the owner on 2026-10-01. The run keeps both files for 30 days; a GitHub Release keeps them permanently (see Labels).

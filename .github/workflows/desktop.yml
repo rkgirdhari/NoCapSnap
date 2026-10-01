@@ -1,6 +1,9 @@
 # CapSnap staff app for Windows: the same Tauri app as on Android, built on a Windows runner into
 # installers (an .msi and a setup .exe). The owner brought this forward from Spec §7 Phase 7 (2026-10-01).
-# Download them from the run's "capsnap-windows" artifact.
+# Download them from the run's "capsnap-windows" artifact (30 days), or from a GitHub Release, which keeps them:
+#   tag vX.Y.Z (= app version), or a manual run on main with "publish a release" ticked (Actions → Desktop →
+#   Run workflow). The installers join the Android APK in release v<app version>; if that tag already exists, its
+#   commit is built, so they match the APK (.github/scripts/publish-release.sh).
 name: Desktop (Windows)
 
 on:
@@ -12,12 +15,18 @@ on:
       - ".github/workflows/desktop.yml"
   push:
     branches: [main]
+    tags: ["v*"]
     paths:
       - "app/**"
       - "crates/capsnap-store/**"
       - "crates/capsnap-sync/**"
       - ".github/workflows/desktop.yml"
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Also publish the installers to GitHub Release v<app version> (main only; creates it if missing)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,11 +43,35 @@ jobs:
     name: Windows installers
     runs-on: windows-2022
     timeout-minutes: 45
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
+      release_sha: ${{ steps.version.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Release source
+        id: version
+        shell: bash
+        env:
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main' }}
+        run: |
+          # The same rule as android.yml: a tag push builds the tag (= app version); a manual release run builds
+          # the existing tag's commit if there is one, else main.
+          version() { node -p 'require("./app/src-tauri/tauri.conf.json").version'; }
+          tag="v$(version)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match the app version ${tag#v} (tauri.conf.json)"; exit 1
+            fi
+          elif [ "$RELEASE" = true ] && git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            git fetch --quiet --depth 1 origin "refs/tags/$tag:refs/tags/$tag"
+            git checkout --quiet --detach "$tag"
+            if [ "v$(version)" != "$tag" ]; then echo "::error::tag $tag holds app version $(version)"; exit 1; fi
+            echo "Release $tag exists: building its commit $(git rev-parse --short HEAD)"
+          fi
+          { echo "tag=$tag"; echo "sha=$(git rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
       - name: Toolchains
         run: |
           corepack enable
@@ -76,3 +109,32 @@ jobs:
           path: dist/
           retention-days: 30
           if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    needs: windows
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@v8
+        with:
+          name: capsnap-windows
+          path: dist
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.windows.outputs.release_tag }}
+          TARGET_SHA: ${{ needs.windows.outputs.release_sha }}
+        run: |
+          # Its own checksum file, so it doesn't replace the Android one in the release.
+          mv dist/SHA256SUMS.txt dist/SHA256SUMS-windows.txt
+          about="Unsigned installers: Windows SmartScreen warns; choose More info, then Run anyway. The setup .exe is the smaller download; the .msi suits managed PCs."
+          .github/scripts/publish-release.sh Windows "$about" true dist
