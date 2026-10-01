@@ -1,0 +1,282 @@
+/*
+ * NO CAP SNAP — design tokens measured from the owner's mockups (W2, decision M3).
+ * Source and method: .hcc-nocapsnap/design/mockups/README.md.
+ *
+ * Contrast (WCAG 2.x, all text pairs ≥ 4.5:1) — checked per surface, and a
+ * colour is only used where it passes:
+ *   --text      #F4E8DA  15.7 bg · 13.6 card · 8.6 stat card
+ *   --muted     #98827C   5.3 bg · 4.5 card · 5.0 list card
+ *   --secondary #A1949B   6.5 bg · 5.6 card · 6.2 list card (not on inputs: 4.47)
+ *   --helper    #8A7D86   4.8 bg · 4.6 list card (never on --card: 4.17)
+ *   --on-input  #B3A6AD   5.6 on --input (placeholders)
+ *   --stat-label #D0BDB7  5.7 on --stat
+ *   --edge      #7A625E   3.4:1 against bg — the visible boundary of inputs and stat cards
+ * System fonts only: the spec forbids external fonts (§6); M4 default keeps the device serif.
+ */
+:root {
+  --bg: #190926;
+  --bg-bar: #150720;
+  --card: #2a1b27; /* dish card, review card, banner */
+  --list: #1e1223; /* list rows, recent plates */
+  --stat: #533a39; /* stat cards, location pill */
+  --input: #402c2e;
+  --edge: #7a625e;
+  --hairline: rgba(252, 233, 197, 0.09);
+
+  --headline: #fce9c5;
+  --text: #f4e8da;
+  --muted: #98827c;
+  --secondary: #a1949b;
+  --helper: #8a7d86;
+  --on-input: #b3a6ad;
+  --stat-label: #d0bdb7;
+
+  --cta: #fdcf10;
+  --cta-press: #e9bd06;
+  --on-cta: #110803;
+  --select: #f9ce22;
+  --tab-active: #cfb242;
+  --tab-idle: #a396a1;
+
+  --ok: #9ad999;
+  --ok-bg: #272f28;
+  --ok-dot: #8feb8c;
+  --wait: #e8b872;
+  --wait-bg: #3a2827;
+  --wait-hi: #f2bf72;
+  --danger: #ff9c8f;
+  --danger-bg: #3a1a22;
+
+  --qr-paper: #fdf0ce;
+  --qr-ink: #1d0e25;
+
+  --serif: "Noto Serif Display", "Noto Serif", "Iowan Old Style", "Palatino Linotype", Palatino,
+    Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial,
+    sans-serif;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", "Noto Sans Mono", Menlo, Consolas, monospace;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --tap: 52px;
+  --gutter: 18px;
+  --tabbar: 68px;
+  --maxw: 560px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  color-scheme: dark;
+}
+
+/* The Android app draws edge to edge (MainActivity.enableEdgeToEdge, targetSdk 35+).
+   A WebView that reports no insets would put the header under the status bar
+   and the tabs under the gesture bar, so the app keeps a minimum clearance. */
+:root[data-shell="device"] {
+  --safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 16px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--select);
+  outline-offset: 3px;
+}
+
+/* ---------- Type ---------- */
+
+.display {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(28px, 8.8vw, 44px);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: var(--headline);
+  text-wrap: balance;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--headline);
+}
+
+.kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.caps {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.muted {
+  color: var(--secondary);
+}
+
+.helper {
+  color: var(--helper);
+  font-size: 13.5px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- Surfaces ---------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+.list-card {
+  background: var(--list);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 0 22px;
+  border-radius: var(--radius);
+  border: 1.5px solid transparent;
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 90ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn.primary {
+  background: var(--cta);
+  color: var(--on-cta);
+}
+
+.btn.primary:active:not(:disabled) {
+  background: var(--cta-press);
+}
+
+.btn.outline {
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--text);
+}
+
+.btn.gold {
+  background: transparent;
+  border-color: var(--tab-active);
+  color: var(--headline);
+}
+
+.btn.block {
+  width: 100%;
+}
+
+.btn.tall {
+  min-height: 56px;
+}
+
+/* ---------- Page scaffold ---------- */
+
+.page {
+  width: 100%;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--gutter) 28px;
+}
+
+.stack > * + * {
+  margin-top: var(--gap, 16px);
+}
+
+.error {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

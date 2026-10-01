@@ -1,0 +1,129 @@
+# CapSnap: whole-project CI.
+#   rust   fmt, clippy and tests for the store, sync and ONB-1 crates (the server has its own workflow,
+#          capsnap-server.yml, which also builds the release binary and rehearses the deploy kit)
+#   app    the staff app UI (svelte-check, production build, no preview bridge in it) and its Rust shell
+#   audit  dependencies: security advisories, licenses compatible with proprietary use (deny.toml),
+#          trusted sources only, and npm advisories for the app's runtime packages
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.crate }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [crates/capsnap-store, crates/capsnap-sync, crates/capsnap-onboard]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.crate }}/target
+          key: rust-${{ matrix.crate }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.crate)) }}
+      - name: fmt, clippy, tests
+        working-directory: ${{ matrix.crate }}
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+  app:
+    name: App (UI and Rust shell)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: pnpm (version from app/package.json)
+        working-directory: app
+        run: corepack enable && pnpm --version
+      - name: UI checks and production build
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm check
+          pnpm build
+          # The browser preview bridge (simulated sign-in and sync) must never ship.
+          if grep -rl "guests.preview.invalid" build; then
+            echo "::error::the preview bridge is in the production build"; exit 1
+          fi
+      - name: Linux libraries for the Tauri shell
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app/src-tauri/target
+          key: rust-app-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+      - name: Rust shell fmt and clippy
+        working-directory: app/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_DENY_VERSION: "0.20.2"
+      # sha256 of cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz, as published with the release.
+      CARGO_DENY_SHA256: "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo-deny (pinned, checksum verified)
+        run: |
+          name="cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl"
+          curl -sSfL -o /tmp/cargo-deny.tgz \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/${name}.tar.gz"
+          echo "${CARGO_DENY_SHA256}  /tmp/cargo-deny.tgz" | sha256sum -c -
+          tar xzf /tmp/cargo-deny.tgz -C /tmp
+          install -m 0755 "/tmp/${name}/cargo-deny" "$HOME/.cargo/bin/cargo-deny"
+          cargo deny --version
+      - name: Rust dependencies
+        run: |
+          for crate in server crates/capsnap-store crates/capsnap-sync crates/capsnap-onboard app/src-tauri; do
+            echo "== $crate"
+            cargo deny --manifest-path "$crate/Cargo.toml" --config deny.toml check
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: App runtime packages (npm advisories, high and critical)
+        working-directory: app
+        run: |
+          corepack enable
+          pnpm audit --prod --audit-level high

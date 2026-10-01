@@ -1,0 +1,38 @@
+[package]
+name = "capsnap-store"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "LicenseRef-HCC-Proprietary"
+description = "CapSnap local-first store: SQLite outbox, menu cache, on-device photo pipeline"
+
+# Standalone: keep this out of the repo-root Cargo workspace.
+[workspace]
+
+[lib]
+# cdylib mirrors how Tauri ships the Rust core on Android (lib<name>.so).
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+# sqlite-bundled compiles SQLite from source with the target's C compiler
+# (the NDK clang on Android) — the thing this spike has to prove.
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite-bundled", "migrate", "macros"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+# W1: capture ingest (digest, id, timestamp).
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# W2: on-device photo pipeline (Spec §3: 2048 px long edge, EXIF/GPS stripped).
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+# Android IPC carries the photo as base64 text (the WebView can't pass a request body).
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3"
+# Independent EXIF parser, used to prove GPS/EXIF really is gone after processing.
+kamadak-exif = "0.6.1"
+tokio = { version = "1", features = ["time"] }
+
+[profile.release]
+strip = "debuginfo"

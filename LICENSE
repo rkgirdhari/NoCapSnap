@@ -1,0 +1,32 @@
+CapSnap (NoCapSnap) — Proprietary License
+
+Copyright (c) 2026 Hammurabi Coding Company LLC. All rights reserved.
+
+This repository is public so that its source code can be read. Publishing it does
+not grant any license to the software, its designs, or its documentation.
+
+You may view this repository and, as GitHub's Terms of Service allow for public
+repositories, fork it on GitHub. Without prior written permission from
+Hammurabi Coding Company LLC, you may not:
+
+  - copy, modify, merge, translate, or create derivative works of the software,
+    its designs, or its documentation, in whole or in part;
+  - run, deploy, host, or provide the software or any derivative work as a
+    product or service, for yourself or for others;
+  - distribute, sublicense, sell, or publish the software, its binaries, or any
+    app-store build of it;
+  - use the names "CapSnap", "NoCapSnap" or "NO CAP SNAP", or the company's
+    names, logos, or designs.
+
+Third-party components keep their own licenses. They are listed in the lockfiles
+(Cargo.lock in each Rust crate, app/pnpm-lock.yaml).
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing enquiries, contact Hammurabi Coding Company LLC through the
+repository owner on GitHub (@rkgirdhari).
