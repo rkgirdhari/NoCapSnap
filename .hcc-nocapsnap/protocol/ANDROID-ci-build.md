@@ -26,6 +26,7 @@ Decision needed from owner: none to merge. Later (W5): create the Play upload ke
 | A PR or a push to `main` that touches the app or its crates | Artifact `capsnap-android`: `CapSnap_0.1.0_arm64_test-signed.apk` and `SHA256SUMS.txt` | 30 days |
 | A tag `vX.Y.Z` that equals the app version in `tauri.conf.json` | The same build as a **GitHub Release** (a pre-release while builds are test-signed) | Permanently |
 | On demand: Actions → Android → Run workflow | The same as a push | 30 days |
+| On demand on `main`, with **"publish a release"** ticked | The same build as GitHub Release `v<app version>`. GitHub creates the tag on the built commit, for when a tag can't be pushed (this workspace's git access can push branches but not tags) | Permanently |
 
 **Every build fails the run if any check fails.** The checks are the ones the W1–W3a gate reports ran by hand:
 
@@ -146,7 +147,7 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 | Packaging script: align, sign, check, checksums | **Built** | Run locally on the W3a build, in both signing modes and the failure cases |
 | The workflow building the APK on GitHub | **Built** | Run 36902688713, green; the APK was re-verified after download |
 | The CI APK running on a phone | **Specified** | Sent to the owner on 2026-10-01; device check D9 is still open |
-| Tag → GitHub Release | **Specified** | Runs only when a tag is pushed; dry-run locally |
+| Tag or manual run → GitHub Release | **Specified** until the first release | Release step dry-run locally against a stub `gh`: manual run creates the tag; an existing tag on a manual run stops it; a pushed tag creates the release; a release made by hand gets the build attached |
 | Upload-key signing of a real `.aab` | **Specified** | Tested with a stand-in key and bundle; needs the real key (W5) |
 | Google Play accepting the bundle | **Specified** | W5 |
 
