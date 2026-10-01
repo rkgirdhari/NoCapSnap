@@ -10,10 +10,11 @@ reports kept their checksums but not the files, and the workspace is deleted whe
 
 ```
 ## Android CI — release APK built and kept on GitHub
-Status: Built (packaging script, run locally); Specified (the workflow on GitHub) until its first green run
-Evidence: package-android.sh on the W3a release build gave the same 12,343,950-byte APK, signed, 16 KB-aligned,
-          Play checks passing; failure cases tested; actionlint (with shellcheck) clean
-Changes: .github/workflows/android.yml and app/scripts/package-android.sh (new); README
+Status: Built (workflow and packaging script); Specified (the APK running on a phone, D9)
+Evidence: android.yml run 36902688713 (commit edcd239) green in 7 min: a 14,830,222-byte test-signed APK,
+          stripped, 16 KB-aligned, Play checks passing, checksum re-verified after download.
+          package-android.sh also run locally on the W3a build, including the failure cases
+Changes: android.yml and app/scripts/package-android.sh (new); release profile strip = "symbols"; README
 Tenth Man: test builds get a new signing key every run; the repository is public, so its builds are downloadable
 Decision needed from owner: none to merge. Later (W5): create the Play upload key and add four repository secrets
 ```
@@ -120,6 +121,19 @@ arm64-v8a/libcapsnap_app_lib.so: 10591744 bytes, LOAD align 0x4000
 - **Still unexplained:** CI's `.text` section is also about 1.8 MB larger (8.8 MB against 7.1 MB), which is
   consistent with the newer compiler. CI uses current stable Rust, like the other workflows.
 
+**Second run (run 36902688713, commit `edcd239`):** green in 7 minutes.
+
+| Check | Result |
+|---|---|
+| File | `CapSnap_0.1.0_arm64_test-signed.apk`, 14,830,222 bytes, sha256 `f88827649bee61cbe422979a99f0c00136b6d3acdd8d65b0c0368f07e98cd80c` |
+| Native library | `libcapsnap_app_lib.so`, 13,079,352 bytes: stripped (no `.symtab`), and its 24 exported `Java_*`/`JNI_OnLoad` entry points kept |
+| Alignment | LOAD `0x4000`; `zipalign -c -P 16` passes |
+| Signature | apksigner verifies it; signer "CN=CapSnap test build" (a throwaway key) |
+| Package | `com.hammurabicoding.nocapsnap` 0.1.0, versionCode 1000, `arm64-v8a` |
+| After download | `SHA256SUMS.txt` matches; the checks above were re-run here and agree |
+
+It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB under the newer compiler (see above).
+
 **The release step's logic, dry-run for both signing modes:**
 
 - test-signed builds become a pre-release;
@@ -130,7 +144,8 @@ arm64-v8a/libcapsnap_app_lib.so: 10591744 bytes, LOAD align 0x4000
 | Item | Label | Why |
 |---|---|---|
 | Packaging script: align, sign, check, checksums | **Built** | Run locally on the W3a build, in both signing modes and the failure cases |
-| The workflow building the APK on GitHub | **Specified** until its first green run | The first run is on this PR |
+| The workflow building the APK on GitHub | **Built** | Run 36902688713, green; the APK was re-verified after download |
+| The CI APK running on a phone | **Specified** | Sent to the owner on 2026-10-01; device check D9 is still open |
 | Tag → GitHub Release | **Specified** | Runs only when a tag is pushed; dry-run locally |
 | Upload-key signing of a real `.aab` | **Specified** | Tested with a stand-in key and bundle; needs the real key (W5) |
 | Google Play accepting the bundle | **Specified** | W5 |
