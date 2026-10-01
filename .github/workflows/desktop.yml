@@ -1,0 +1,78 @@
+# CapSnap staff app for Windows: the same Tauri app as on Android, built on a Windows runner into
+# installers (an .msi and a setup .exe). The owner brought this forward from Spec §7 Phase 7 (2026-10-01).
+# Download them from the run's "capsnap-windows" artifact.
+name: Desktop (Windows)
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "crates/capsnap-store/**"
+      - "crates/capsnap-sync/**"
+      - ".github/workflows/desktop.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "crates/capsnap-store/**"
+      - "crates/capsnap-sync/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  windows:
+    name: Windows installers
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Toolchains
+        run: |
+          corepack enable
+          pnpm --version
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            app/src-tauri/target
+          key: desktop-windows-${{ hashFiles('app/src-tauri/Cargo.lock') }}
+      - name: Build (release, no browser preview)
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm tauri build
+      - name: Collect installers and checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item app/src-tauri/target/release/bundle/msi/*.msi dist/
+          Copy-Item app/src-tauri/target/release/bundle/nsis/*-setup.exe dist/
+          $preview = Get-ChildItem app/build -Recurse -File | Select-String -Pattern "guests.preview.invalid" -SimpleMatch -List
+          if ($preview) { throw "the browser preview bridge is in the release build: $($preview.Path)" }
+          Get-ChildItem dist -File | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content dist/SHA256SUMS.txt
+          Get-Content dist/SHA256SUMS.txt
+          Get-ChildItem dist | Format-Table Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capsnap-windows
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
