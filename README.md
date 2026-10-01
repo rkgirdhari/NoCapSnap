@@ -22,6 +22,7 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 | W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
 | W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Approved (device check D9 still open) |
 | W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Open; kit built and rehearsed. G1 = nocapsnap.hammurabi.click; waiting on DNS + preflight |
+| iOS | Apple App Store (not in the spec; added by the owner 2026-10-01) | Proposed; opens after W4 ([proposal](.hcc-nocapsnap/protocol/IOS-PROPOSAL-apple-app-store.md)) |
 
 ## Layout
 
