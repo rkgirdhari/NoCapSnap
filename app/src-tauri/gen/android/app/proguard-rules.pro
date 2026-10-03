@@ -19,3 +19,10 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# The page reads the network status through CapSnapNetwork.isOnline() (NetworkStatus.kt). The WebView
+# finds the method by its name and its @JavascriptInterface annotation, so R8 must keep both.
+-keepattributes RuntimeVisibleAnnotations
+-keepclassmembers class com.hammurabicoding.nocapsnap.NetworkStatus$Bridge {
+  @android.webkit.JavascriptInterface public <methods>;
+}
