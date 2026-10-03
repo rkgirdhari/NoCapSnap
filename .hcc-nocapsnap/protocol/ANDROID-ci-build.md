@@ -146,7 +146,7 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 |---|---|---|
 | Packaging script: align, sign, check, checksums | **Built** | Run locally on the W3a build, in both signing modes and the failure cases |
 | The workflow building the APK on GitHub | **Built** | Run 36902688713, green; the APK was re-verified after download |
-| The CI APK running on a phone | **Specified** | Sent to the owner on 2026-10-01; device check D9 is still open |
+| The CI APK running on a phone | **Built** | Device check D9 on the owner's Android phone, with releases v0.1.0 to v0.1.2 installed from GitHub (W2 record, "D9 results") |
 | Manual run → GitHub Release | **Built** | [v0.1.0](https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0), run 36926943872: tag on `bfa5cf0`, pre-release, APK and `SHA256SUMS.txt` attached. The APK was re-downloaded from the release: its checksum matches, it is signed, `arm64-v8a`, and stripped |
 | Pushed tag, a release made by hand, or adding to an existing release → GitHub Release | **Specified** | Not run yet for Android; the shared `.github/scripts/publish-release.sh` and the source step were dry-run locally (stub `gh`; a shallow clone of a local remote with and without the tag) |
 | Upload-key signing of a real `.aab` | **Specified** | Tested with a stand-in key and bundle; needs the real key (W5) |
@@ -207,3 +207,24 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 - **Release notes:** they have the per-platform sections the workflows write. A "What's new" section could not be
   added from the cloud workspace, which may not edit releases (HTTP 403); the owner can paste it in.
 - **D9:** the owner retests from this release, installed the way a user would.
+
+## Third release: v0.1.2 (2026-10-03)
+
+- **Why:** on v0.1.1 the owner's phone still said Online in airplane mode while a VPN was on.
+- **What it carries:** #26, where the Offline status comes from Android's own check of a validated non-VPN network
+  (`NetworkStatus.kt`). The WebView's `navigator.onLine` is no longer used on Android. Version 0.1.2, versionCode
+  1002.
+- **Before merging:** the PR's APK was checked for what R8 must keep. `classes.dex` holds
+  `NetworkStatus$Bridge`, the method name `isOnline`, the `JavascriptInterface` annotation and `CapSnapNetwork`.
+- **Made by:** manual release runs 37111262702 (Android) and 37111264083 (Windows), on `7a83ca5`. Tag `v0.1.2`
+  points to that commit; it is a pre-release.
+- **Release:** <https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.2>.
+- **APK:** `CapSnap_0.1.2_arm64_test-signed.apk`, 14,842,510 bytes, sha256
+  `5851fb248f32fda87521e7fde8127590d2f7e8ab23a4b7e8019d4e22fe6716c5`.
+- **Checked as the public gets it:** every file was downloaded anonymously (HTTP 200), and `sha256sum -c` passes. The
+  APK carries versionName 0.1.2 and the bridge above.
+- **On the owner's phone (D9):**
+  - airplane mode with the VPN on: "Offline", no sync button;
+  - Wi-Fi back on: "Online";
+  - device check: SQLite 3.51.3, WAL;
+  - a capture after a fresh install.

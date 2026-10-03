@@ -454,3 +454,41 @@ adb install capsnap-w2-arm64-release-debugsigned.apk
 - **ONB-1 was labelled Built but could not read https sites.** The crate had no TLS backend: reqwest was built
   without default features, and none was added. W2's tests used only plain http, so they missed it. It was fixed
   in W3a (`21867df`), with an https regression test. See the W3a report, finding 1.
+
+## D9 results (2026-10-03)
+
+The owner ran the device checklist on their own Android phone, in demo mode. They installed builds from GitHub:
+v0.1.0, then v0.1.1 and v0.1.2 from the releases page, the way a user would. Evidence is the owner's screenshots
+and messages.
+
+| Step | Result | Evidence |
+|---|---|---|
+| 1. Launch, insets | **Pass** after a fix. The header and tabs cleared the system bars from the start. On screens without tabs (camera, review, invitation), the last line sat under the 3-button navigation bar: fixed in #23 | Screenshots, v0.1.0 and v0.1.1 |
+| 2. Settings: name greeting | **Pass** | Home greeted the owner by the saved name (v0.1.0). Uninstalling cleared it, as expected. Set again on v0.1.2: "Good evening, Hammurabi." |
+| 2. Settings: device check | **Pass** | v0.1.2: "SQLite 3.51.3 · wal", 1 saved offline, 0 synced |
+| 3. Capture, in-app viewfinder | **Pass** | Photo, Review and save; "1 saved offline" (v0.1.0); again on v0.1.2 after a fresh install |
+| 4. Capture, phone camera app | **Pass** | The owner: *"bother cameras tested now"* (v0.1.1) |
+| 5. Back button; camera indicator goes off | **Not reported** | Open |
+| 6. History rows | **Pass** | Thumbnail, time and "Demo · stays on this phone" (v0.1.0) |
+| 6. Offline in airplane mode | **Pass on v0.1.2**, after two fixes | Details below this table |
+| 7. Kill and reopen | **Pass, as reported** | The owner: *"All good"* after v0.1.2; no screenshot |
+| 8. Stored photo has no EXIF, long edge ≤ 2048 | **Not run** | Needs `adb` and USB debugging. Covered by host tests only, so it stays **Specified** on a device |
+
+**Step 6, Offline in airplane mode:**
+- v0.1.0 kept saying Online: the WebView had no `ACCESS_NETWORK_STATE`. Fixed in #23.
+- v0.1.1 still said Online with a VPN on: the WebView counted the VPN, which stays up in airplane mode. Fixed in #26,
+  where Android's own check of a validated non-VPN network decides.
+- v0.1.2: airplane mode with the VPN on shows "Offline" with no sync button. Wi-Fi back on shows "Online".
+
+**Also found and fixed:**
+- The Home wording in the early hours: "Morning prep" beside "Good evening" at 2:35 AM. It now reads "Late
+  service" before 5 AM (#23).
+- The sync icon looked like a button but did nothing. It is now a **Sync now** button (#23). In demo mode it says
+  "Sign in to sync (Settings)", as expected while there is no server.
+
+**Labels change:**
+- The device items in "Labels" above are now **Built** on one Android phone: WebView camera permission, both
+  capture routes, base64 IPC, media responses, SQLite in the sandbox, and insets.
+- Two items stay **Specified**: on-device EXIF stripping (step 8), and photo timing and memory on a low-end phone
+  (not measured).
+- The W3a additions to the checklist (sign-in, sync, QR, guest page) need a live server and wait for W3b.

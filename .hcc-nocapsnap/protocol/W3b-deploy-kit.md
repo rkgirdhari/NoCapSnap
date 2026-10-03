@@ -216,7 +216,8 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
   - the `VPS_KNOWN_HOSTS` secret, with the fingerprint checked on the box;
   - the `CAPSNAP_DOMAIN` variable;
   - optionally, a `capsnap-production` environment with you as required reviewer.
-- **D9: still open.** The first real capture from a phone becomes part of W3b's live check.
+- **D9:** W2's part passed on the owner's phone on 2026-10-03 (W2 record). W3a's additions (sign-in, sync, QR,
+  guest page) and the first real capture from a phone are part of W3b's live check.
 - **Optional:** a restricted deploy user (Tenth Man, third point).
 
 ## Owner decisions (2026-10-01)
