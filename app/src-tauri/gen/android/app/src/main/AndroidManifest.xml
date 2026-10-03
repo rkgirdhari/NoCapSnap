@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets the WebView follow network changes, so navigator.onLine and the
+         online/offline events (the "Online"/"Offline" status) are true to the phone.
+         Without it the WebView keeps reporting online. A normal permission: granted at
+         install, never asked. Found on the owner's phone in the D9 device check. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- In-app viewfinder (WebView getUserMedia). wry asks for it at the moment of
          use. Without this declaration the phone-camera route needs no runtime
          permission at all — see W1 gate report, decision D5. -->
