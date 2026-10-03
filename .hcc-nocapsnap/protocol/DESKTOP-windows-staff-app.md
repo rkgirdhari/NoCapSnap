@@ -79,3 +79,18 @@ Built from tag `v0.1.0`'s commit `bfa5cf0`, the same source as the release's APK
 - These differ from the first build's checksums because the installers record build-time data. The app source is the same.
 - `SHA256SUMS-windows.txt` has Windows line endings. GNU `sha256sum -c` accepts it as it is.
 - The release's setup .exe was sent to the owner on 2026-10-01.
+
+## In release v0.1.1 (2026-10-03)
+
+Built from `c1a280d` (#24's merge commit), the same source as the release's APK. Desktop run 37109136260 added the
+files to the release that the Android run had just created.
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `CapSnap_0.1.1_x64-setup.exe` | 4,306,654 bytes | `3a0ee5278c3fb618025a40b398bb43938789e64f98bdeba192831120e51b445d` |
+| `CapSnap_0.1.1_x64_en-US.msi` | 6,107,136 bytes | `4b99865acbc9983da5ecfefac855f2c8479ca73babd12bc2f8494b590203cfcd` |
+
+- Both were downloaded anonymously from the release, and `sha256sum -c SHA256SUMS-windows.txt` passes.
+- They carry the #23 fixes that apply on Windows: the Sync now button and the early-hours wording. The nav-bar inset
+  and the network permission are Android-only.
+- The app running on the owner's PC is still **Specified**.

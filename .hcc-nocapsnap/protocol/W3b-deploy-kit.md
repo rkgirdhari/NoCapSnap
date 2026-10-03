@@ -240,3 +240,50 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
   visited it will insist on https for this name, which CapSnap already serves. Nothing to do.
 - **Order:** change DNS → `preflight.sh nocapsnap.hammurabi.click` shows "DNS: … points at this box" →
   `install.sh --domain nocapsnap.hammurabi.click` → `smoke.sh` from outside.
+
+## Owner decision (2026-10-03): reinstall the VPS with Linux
+
+> *"for server hosting we will need to setup the VPS I will need help switching the 2016 server out for the Linux as
+> discussed since windows 2016 ends in Jan. 2027"*
+
+- **Why:**
+  - The ZAP VPS turned out to run **Windows Server 2016**, which ends extended support on 12 January 2027 (Desktop
+    record).
+  - The owner chose to reinstall it with Linux rather than build a Windows deploy kit.
+- **Target:** **Ubuntu 24.04 LTS**, the system the kit was rehearsed on in CI (systemd 255, nginx 1.24). Debian 12 if
+  ZAP doesn't offer it.
+- **What changes for W3b:**
+  - The kit is used unchanged.
+  - The box starts empty: no nginx, no certbot, no other sites. The runbook gains a step for that ("A freshly
+    installed box" in `deploy/README.md`).
+  - The first Tenth Man point (an nginx, certbot state and firewall nobody here has seen) mostly falls away, because
+    the box will match the rehearsal.
+- **What the reinstall costs:**
+  - It wipes the disk, including the company site that IIS serves there now. The owner backs it up first.
+  - Where the company site lives afterwards is the owner's call; the recommendation is the existing Manus copy (see
+    DNS below).
+
+**DNS, observed read-only from outside on 2026-10-03:**
+
+| Name | Answers |
+|---|---|
+| `nocapsnap.hammurabi.click` | Two A records: Manus's address, and the VPS |
+| `hcc.software`, `www.hcc.software` | Two A records each: Manus's address, and the VPS |
+| `hammurabi.click`, `www.hammurabi.click` | Manus only |
+
+With two A records, each visitor lands on either one, so:
+- **Before the reinstall:** the VPS records for `hcc.software` and `www` should go, unless the company site moves
+  to the new box.
+- **Before install:** the Manus record for `nocapsnap` should go.
+
+**Order, done by the owner:**
+1. Back up the IIS site(s): their folders, plus their bindings, which show the domains they serve.
+2. DNS changes as above.
+3. Make an SSH key on the owner's PC.
+4. In the ZAP panel, reinstall with Ubuntu 24.04 LTS, outside ZAP's maintenance window (7 October, 05:00–11:00).
+5. Run "A freshly installed box", then the first-install runbook: preflight, install, smoke, test data.
+
+| Item | Label |
+|---|---|
+| The VPS on Ubuntu 24.04, prepared as in "A freshly installed box" | **Specified**: the owner's steps, not started |
+| CapSnap live on the VPS | **Specified**, as above |

@@ -178,3 +178,32 @@ It is 2.5 MB larger than W3a: the library's code grew from 7.1 MB to 8.8 MB unde
 - **Release:** <https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.0>. It is a pre-release, because the build is test-signed. Tag `v0.1.0` points to `bfa5cf0`.
 - **APK:** `CapSnap_0.1.0_arm64_test-signed.apk`, 14,842,510 bytes, sha256 `d83ed22ef5cf810be7a92f7bb42201d6d6b6924fca78e56a345c7aab49f866ea`.
 - **Windows installers:** not in the first publish. Added later by `desktop.yml`'s release step, built from the same tagged commit (see the Desktop record).
+
+## Second release: v0.1.1 (2026-10-03)
+
+- **Requested by the owner:** *"do the v0.1.1 release I can't download from you needs to be downloaded from where
+  others would do it so I know it works"*.
+- **What it carries:** the D9 fixes from #23:
+  - the nav-bar inset;
+  - an Offline status that follows the phone's network (`ACCESS_NETWORK_STATE`);
+  - the Sync now button;
+  - the early-hours wording.
+- **Version:** 0.1.1, versionCode 1001 (#24).
+- **Made by:** manual runs of Android and Desktop on `main` with "publish a release":
+  - Android run 37109134505 created the release and the tag;
+  - Desktop run 37109136260 added the Windows files.
+
+  Both runs waited behind the push builds of the same commit (one concurrency group per workflow and ref), then took
+  about 4 minutes each.
+- **Release:** <https://github.com/rkgirdhari/NoCapSnap/releases/tag/v0.1.1>.
+  - A pre-release, because the build is test-signed.
+  - Tag `v0.1.1` points to `c1a280d`, the merge commit of #24.
+- **APK:** `CapSnap_0.1.1_arm64_test-signed.apk`, 14,842,510 bytes, sha256
+  `88ecb56bd309c50477bb48244eb5a71eabd9e2747ce01b12b061ce813a9cade8`.
+- **Checked as the public gets it:** every file was downloaded anonymously from the release's download URLs (HTTP
+  200), and:
+  - `sha256sum -c` passes against both checksum files;
+  - the APK's manifest carries versionName 0.1.1 and `ACCESS_NETWORK_STATE`.
+- **Release notes:** they have the per-platform sections the workflows write. A "What's new" section could not be
+  added from the cloud workspace, which may not edit releases (HTTP 403); the owner can paste it in.
+- **D9:** the owner retests from this release, installed the way a user would.

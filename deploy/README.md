@@ -1,8 +1,9 @@
 # CapSnap deploy kit (W3b)
 
-Puts the CapSnap server on the ZAP VPS behind the nginx that already serves the box's other
-sites. Built for the conventions in the owner's ZAP VPS docs; the reasons for each choice are
-in `../.hcc-nocapsnap/protocol/W3-PROPOSAL-hosted-feedback-slice.md` ("D4 intake").
+Puts the CapSnap server on the ZAP VPS behind nginx: the one already serving the box's other
+sites, or a fresh one (see "A freshly installed box"). Built for the conventions in the owner's
+ZAP VPS docs; the reasons for each choice are in
+`../.hcc-nocapsnap/protocol/W3-PROPOSAL-hosted-feedback-slice.md` ("D4 intake").
 
 | File | Runs where | What it does |
 |---|---|---|
@@ -25,6 +26,47 @@ in `../.hcc-nocapsnap/protocol/W3-PROPOSAL-hosted-feedback-slice.md` ("D4 intake
 | `/etc/nginx/sites-available/capsnap.conf` | The two `server` blocks for the guest domain | Only nginx faces the internet |
 
 The server listens on `127.0.0.1:8090` only. Don't open that port in `ufw`.
+
+## A freshly installed box
+
+For a new or reinstalled Ubuntu 24.04 LTS or Debian 12 server, before "First install". The commands run as
+root on the box unless marked otherwise.
+
+1. **Log in with a key, from your own computer.**
+   1. Make a key once (Windows PowerShell, macOS or Linux): `ssh-keygen -t ed25519`. Give it a passphrase.
+   2. Put the public half on the box, if the provider's panel didn't. In PowerShell:
+
+      ```powershell
+      type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@<box> "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
+      ```
+
+   3. If `ssh` warns that the host key changed after a reinstall, that's expected once. Run
+      `ssh-keygen -R <box>` and connect again.
+2. **Updates, and the packages the kit needs.**
+
+   ```bash
+   apt update && apt full-upgrade -y
+   apt install -y nginx certbot ufw unattended-upgrades
+   dpkg-reconfigure -plow unattended-upgrades     # answer Yes: security updates install themselves
+   ```
+
+3. **Firewall: SSH, http and https only.** If SSH listens on a port other than 22, allow that port instead
+   before enabling, or you will lock yourself out.
+
+   ```bash
+   ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable    # answer y
+   ```
+
+4. **Key-only logins.** First, in a second window, check that `ssh root@<box>` logs in with the key and no
+   password. Then:
+
+   ```bash
+   printf '%s\n' 'PasswordAuthentication no' 'KbdInteractiveAuthentication no' \
+     'PermitRootLogin prohibit-password' > /etc/ssh/sshd_config.d/10-key-only.conf
+   sshd -t && systemctl restart ssh
+   ```
+
+   Keep the first window open until a new login with the key works.
 
 ## First install
 
