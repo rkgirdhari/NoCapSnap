@@ -1,6 +1,6 @@
 [package]
 name = "capsnap-app"
-version = "0.1.0"
+version = "0.1.1"
 description = "CapSnap staff app (Tauri shell for Android)"
 authors = ["Hammurabi Coding Company LLC"]
 edition = "2024"
