@@ -320,3 +320,9 @@ own `adb reverse`. The real test of step 3 is W3b, with a domain and https.
   recommended before W3b.
 - **D4, G1, G2: still open.** W3b cannot start without them. D4 is Spec §7's hard gate.
 - Next: W3b (deploy), once D4, G1 and G2 are answered. Nothing starts without the owner's approval.
+
+## D9 (2026-10-03)
+
+- **W2's part of the checklist: run on the owner's phone.** The results are in the W2 record ("D9 results").
+- **This record's additions** (sign-in, sync, QR, guest page, revoking a session): not run yet. They need a live
+  server, so they move to W3b's live check on the VPS.

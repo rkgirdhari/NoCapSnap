@@ -94,3 +94,15 @@ files to the release that the Android run had just created.
 - They carry the #23 fixes that apply on Windows: the Sync now button and the early-hours wording. The nav-bar inset
   and the network permission are Android-only.
 - The app running on the owner's PC is still **Specified**.
+
+## In release v0.1.2 (2026-10-03)
+
+Built from `7a83ca5` (#26), by Desktop run 37111264083. #26 changes only the Android side and the version. On
+Windows the status still follows the WebView's `navigator.onLine`.
+
+| File | Size | SHA-256 |
+|---|---|---|
+| `CapSnap_0.1.2_x64-setup.exe` | 4,307,604 bytes | `57769fc1e09dcfc12ccf95ad1135b75dd654565ccc67bd68a12d1230f8e63a75` |
+| `CapSnap_0.1.2_x64_en-US.msi` | 6,107,136 bytes | `8ce2edef681cfa8e1978df965f6141a0dfc89a296d914887a9d5f6419446ba13` |
+
+Both were downloaded anonymously from the release, and `sha256sum -c SHA256SUMS-windows.txt` passes.

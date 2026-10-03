@@ -58,9 +58,9 @@ and waits for owner approval. Claims are labelled **Built** (compiles + tested),
 |---|---|---|
 | W0 | Spec intake + SQLite-on-Android spike | Approved |
 | W1 | Tauri 2 Android shell + camera spike, staff UI design | Closed; device checklist D7 waived by the owner |
-| W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved (device check D9 still open) |
-| W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Approved (device check D9 still open) |
-| W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Kit built and rehearsed; deployment paused: the VPS turned out to run Windows Server 2016 |
+| W2 | Staff UI from the owner's NO CAP SNAP mockups, on-device photo pipeline, ONB-1 import crate | Approved; device check D9 run on Android (2026-10-03): passed, two steps open (see the W2 record) |
+| W3a | Hosted feedback slice, built and host-tested: server, guest portal, phone sync, real QR | Approved; D9: the phone part passed, sign-in and sync wait for the server (W3b) |
+| W3b | Deploy to the ZAP VPS (nginx, TLS, guest domain) | Kit built and rehearsed; the VPS runs Windows Server 2016, and the owner chose to reinstall it with Ubuntu 24.04 (2026-10-03) |
 | iOS | Apple App Store (not in the spec; added by the owner 2026-10-01) | Proposed; opens after W4 ([proposal](.hcc-nocapsnap/protocol/IOS-PROPOSAL-apple-app-store.md)) |
 | Desktop | Windows build of the staff app (Spec Phase 7, brought forward by the owner 2026-10-01) | Installers built; awaiting the owner's first run ([record](.hcc-nocapsnap/protocol/DESKTOP-windows-staff-app.md)) |
 
