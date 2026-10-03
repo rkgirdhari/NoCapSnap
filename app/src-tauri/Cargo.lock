@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "capsnap-app"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "capsnap-store",
  "capsnap-sync",
