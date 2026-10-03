@@ -63,6 +63,10 @@
   .shell.with-tabs {
     padding-bottom: calc(var(--tabbar) + var(--safe-bottom));
   }
+  /* Full-screen steps (camera, review, invitation) still end above Android's navigation bar. */
+  .shell:not(.with-tabs) {
+    padding-bottom: var(--safe-bottom);
+  }
 
   .ribbon {
     margin: 0;

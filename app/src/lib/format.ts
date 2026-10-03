@@ -32,8 +32,9 @@ export const whenLabel = (iso: string, now = new Date()) => `${dayLabel(iso, now
 /** "Tuesday · Dinner service" — the way the pass talks about time. */
 export function serviceLine(now = new Date()): string {
   const h = now.getHours();
+  // Before 5 AM is still last night's service, as greeting() and Home's "Tonight's service" have it.
   const service =
-    h < 11 ? "Morning prep" : h < 16 ? "Lunch service" : h < 22 ? "Dinner service" : "Late service";
+    h < 5 || h >= 22 ? "Late service" : h < 11 ? "Morning prep" : h < 16 ? "Lunch service" : "Dinner service";
   return `${weekday.format(now)} · ${service}`;
 }
 
