@@ -15,6 +15,8 @@ pub struct Config {
     pub guest_link_days: i64,
     pub guest_session_minutes: i64,
     pub max_media_bytes: usize,
+    /// Who a privacy request goes to (shown on `/privacy`); `CAPSNAP_PRIVACY_CONTACT`.
+    pub privacy_contact: Option<String>,
 }
 
 impl Config {
@@ -29,6 +31,7 @@ impl Config {
             guest_link_days: 30,
             guest_session_minutes: 30,
             max_media_bytes: 10 * 1024 * 1024,
+            privacy_contact: None,
         }
     }
 
@@ -52,6 +55,7 @@ impl Config {
                 .map_err(|_| format!("CAPSNAP_BIND is not an address: {bind}"))?;
         }
         cfg.cookie_secure = var("CAPSNAP_INSECURE_COOKIES").is_none();
+        cfg.privacy_contact = var("CAPSNAP_PRIVACY_CONTACT");
         Ok(cfg)
     }
 }
