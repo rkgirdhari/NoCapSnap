@@ -174,3 +174,46 @@ pub async fn revoke_sessions(pool: &SqlitePool, login: &str) -> Result<u64, Stri
     .map(|r| r.rows_affected())
     .map_err(|e| e.to_string())
 }
+
+/// Remove a staff member's personal data on request (privacy policy; Play's account-deletion
+/// rule). The row stays, so the captures and consent records that point at it keep working,
+/// but it is anonymised: the login and display name are replaced, the password is replaced by
+/// a hash of a random value nobody sees, the account is deactivated, its device sessions and
+/// location links are deleted. Returns how many sessions were deleted.
+pub async fn remove_staff(pool: &SqlitePool, login: &str) -> Result<u64, String> {
+    let login = login.trim().to_lowercase();
+    let row: Option<(String,)> = sqlx::query_as("SELECT id FROM staff WHERE login = ?")
+        .bind(&login)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    let (id,) = row.ok_or_else(|| format!("no staff member with login {login}"))?;
+
+    let secret = format!("{}{}", new_id(), new_id());
+    let hash = tokio::task::spawn_blocking(move || password::hash(&secret))
+        .await
+        .map_err(|e| e.to_string())??;
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    sqlx::query(
+        "UPDATE staff SET active = 0, login = ?, display_name = 'Former staff', password_hash = ? WHERE id = ?",
+    )
+    .bind(format!("removed-{}", &id[..8.min(id.len())]))
+    .bind(&hash)
+    .bind(&id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| e.to_string())?;
+    sqlx::query("DELETE FROM staff_locations WHERE staff_id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    let sessions = sqlx::query("DELETE FROM device_sessions WHERE staff_id = ?")
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected();
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(sessions)
+}

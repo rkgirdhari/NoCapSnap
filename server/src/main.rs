@@ -14,6 +14,7 @@ const USAGE: &str = "usage:
       (reads the password from standard input)
   capsnap-server import-menu <location-id> <menu.json>   ([{\"name\":…,\"category\":…}, …])
   capsnap-server revoke-sessions <login>
+  capsnap-server remove-staff <login>        (anonymise a staff member on request; keeps their captures)
   capsnap-server retention
   capsnap-server backup <out-dir>             (a consistent snapshot; prints its path)
   capsnap-server verify-backup <snapshot-dir>
@@ -100,6 +101,9 @@ async fn run(args: &[String]) -> Result<String, String> {
                 .await
                 .map(|n| format!("{n} dishes"))
         }
+        ["remove-staff", login] => admin::remove_staff(pool, login)
+            .await
+            .map(|n| format!("removed; {n} sessions deleted")),
         ["revoke-sessions", login] => admin::revoke_sessions(pool, login)
             .await
             .map(|n| format!("{n} sessions revoked")),

@@ -54,9 +54,10 @@ sensitive data is not involved; Spec §6's "only CAMERA" is about sensitive perm
 
 ## Gaps (found while drafting)
 
-1. **No way to delete a staff account.** `capsnapctl` can revoke sessions but cannot remove a staff row, so the "Yes" to
-   deletion would be done by hand on the box. Needs a small `delete-staff` admin command (and a rule for the captures
-   that staff member made). **Specified**, not built.
+1. **Deleting a staff account: built.** `capsnapctl remove-staff <login>` anonymises the account (login and display name
+   replaced, password replaced by a hash of a random value, deactivated, sessions and location links deleted). The
+   captures and consent records that point at the row stay, as the restaurant's records; they now show "Former staff".
+   The ONB-1 consent record keeps the site URL and acceptance time. **Built**, `server/tests/remove_staff.rs`.
 2. **No link to the policy in the app.** Settings shows the server address but not the policy. Opening a page needs the
    Tauri opener, which the app does not have; adding it changes the app's capabilities and needs its own review.
    **Specified**, not built.
