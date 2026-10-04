@@ -70,9 +70,15 @@ On a pass, R1 is lifted: real guest feedback is allowed.
   not closed.
 - **Consistency.** A plain copy of a WAL-mode database taken while the server writes can be corrupt. The design
   uses SQLite's own backup, and a test must prove it under concurrent writes.
-- **Photos can be large.** Daily full copies of 30 days of photos may be heavy on a shared VPS. Mitigation: photo
+- **Photos can be large. (Built 2026-10-04.)** Daily full copies of 30 days of photos may be heavy on a shared VPS. Mitigation: photo
   files are immutable, so snapshots copy only new files and the manifest references the rest. This adds code to
   get right, so it is called out here rather than assumed.
+  *As built:* each photo is `age`-encrypted once into `pool/<sha256>.age`; the daily archive holds the database and a
+  manifest (format 2) whose `external` entries name pool photos by hash; `refs/<snapshot>.sha` records what each
+  kept snapshot needs, and a pool file no kept snapshot needs is deleted. **New dependency:** a snapshot alone no
+  longer restores everything, so copies 2 and 3 must carry `pool/` and `refs/` with the archives, and the restore
+  drill must exercise `--pool`. `restore-backup` checks every pool photo against its hash before writing anything.
+  Tested in `server/tests/backup.rs` and in the CI deploy-kit rehearsal.
 - **Size.** If it grows, split it: W4a (snapshot, encryption, restore, tested locally and in CI) and W4b (the
   real copies and the owner's drill), as W3 was.
 

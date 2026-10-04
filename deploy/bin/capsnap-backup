@@ -4,6 +4,12 @@
 # the `capsnap` user. Copy 1 of the three lives in /var/lib/capsnap-backup; copies 2 and 3
 # are W4b (the owner's hardware).
 #
+# Photos never change, so each one is encrypted ONCE into pool/<sha256>.age and the daily
+# archive holds only the database, the manifest and any photo that arrived after the pool was
+# filled. refs/<snapshot>.sha lists the pool photos each kept snapshot needs; a pool file no kept
+# snapshot needs is deleted, which is how a photo that retention removed leaves the backups too.
+# Copy the whole directory (archives, pool, refs) to copies 2 and 3: rsync sends only what is new.
+#
 #   capsnap-backup run       snapshot, verify, encrypt, checksum, prune
 #   capsnap-backup status    age of the last good backup; exits 1 when older than 36 hours
 #
@@ -40,19 +46,45 @@ run() {
     [ -s "$RECIPIENTS" ] || fail "$RECIPIENTS is missing or empty (the public key to encrypt to)"
     command -v age >/dev/null || fail "age is not installed (apt install age)"
     umask 077
-    mkdir -p "$DEST"
+    mkdir -p "$DEST/pool" "$DEST/refs"
+    exec 9>"$DEST/.lock"
+    flock -n 9 || fail "another backup is running"
     stage=$(mktemp -d "$DEST/.stage.XXXXXX")
-    trap 'rm -rf "$stage"' EXIT
+    known=$(mktemp "$DEST/.known.XXXXXX")
+    trap 'rm -rf "$stage" "$stage.refs" "$known"' EXIT
 
-    snap=$("$BIN" backup "$stage")
+    # 1. Every photo on the box goes into the pool once (a pool file is named by its photo's hash).
+    find "$DEST/pool" -name '*.partial' -delete
+    if [ -d "$DATA/media" ]; then
+        find "$DATA/media" -type f -print0 | xargs -0 -r sha256sum | while read -r sha path; do
+            [ -e "$DEST/pool/$sha.age" ] && continue
+            age -R "$RECIPIENTS" -o "$DEST/pool/$sha.age.partial" "$path"
+            mv "$DEST/pool/$sha.age.partial" "$DEST/pool/$sha.age"
+        done
+    fi
+    # 2. The snapshot leaves out every photo the pool holds.
+    find "$DEST/pool" -name '*.age' -printf '%f\n' | sed 's/\.age$//' >"$known"
+    snap=$("$BIN" backup "$stage" --known "$known")
     "$BIN" verify-backup "$snap" >/dev/null
     name=$(basename "$snap")
+
+    # 3. A photo the snapshot leaves out must really be in the pool, or it could not be restored.
+    "$BIN" list-backup-photos "$snap" | awk '$3 == "external" {print $1}' | sort -u >"$stage.refs"
+    while read -r sha; do
+        [ -s "$DEST/pool/$sha.age" ] || fail "photo $sha is missing from the pool"
+    done <"$stage.refs"
 
     tar -C "$stage" -cf - "$name" | age -R "$RECIPIENTS" -o "$DEST/$name.tar.age.partial"
     mv "$DEST/$name.tar.age.partial" "$DEST/$name.tar.age"
     (cd "$DEST" && sha256sum "$name.tar.age" >"$name.tar.age.sha256" && sha256sum -c --quiet "$name.tar.age.sha256")
+    mv "$stage.refs" "$DEST/refs/$name.sha"
 
+    # 4. Forget what is past the keep window: archives, their photo lists, then pool files no list needs.
     find "$DEST" -maxdepth 1 -name 'snapshot-*.tar.age*' -mtime "+$KEEP_DAYS" -delete
+    find "$DEST/refs" -name 'snapshot-*.sha' -mtime "+$KEEP_DAYS" -delete
+    cat "$DEST"/refs/snapshot-*.sha 2>/dev/null | sort -u >"$known"
+    find "$DEST/pool" -name '*.age' -printf '%f\n' | sed 's/\.age$//' | sort | comm -23 - "$known" |
+        while read -r sha; do rm -f "$DEST/pool/$sha.age"; done
     date -u +%Y-%m-%dT%H:%M:%SZ >"$DEST/LAST_GOOD"
     rm -f "$MARKER"
     echo "capsnap-backup: wrote $DEST/$name.tar.age"

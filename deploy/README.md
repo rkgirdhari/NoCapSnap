@@ -144,6 +144,11 @@ It needs these repository settings:
 A daily timer takes a consistent snapshot of the database and photos, encrypts it with `age`, and keeps it in
 `/var/lib/capsnap-backup` for 30 days (photos live 30 days too, Spec §6). Copies 2 and 3 are W4b.
 
+Photos never change, so each is encrypted **once** into `pool/<sha256>.age`; the daily `snapshot-*.tar.age` holds the
+database and manifest and refers to the pool's photos by hash (`refs/` records which snapshot needs which). A pool
+photo no kept snapshot needs is deleted, so photos removed by retention leave the backups within the 30 days.
+**Copy the whole directory** (archives, `pool/`, `refs/`) to copies 2 and 3; `rsync -a` sends only what is new.
+
 - **The box holds only the public key.** Make the key pair on **your own computer**, never on the box:
   `age-keygen -o capsnap-backup-key.txt` prints the public key (`age1…`). Put that one line in
   `/etc/capsnap/backup.recipients` (`root:capsnap`, 0640), then re-run `install.sh` to enable the timer.
@@ -158,8 +163,13 @@ A daily timer takes a consistent snapshot of the database and photos, encrypts i
   sha256sum -c snapshot-<time>.tar.age.sha256            # first, with both files in one directory
   age -d -i capsnap-backup-key.txt snapshot-<time>.tar.age | tar -xf -
   capsnap-server verify-backup snapshot-<time>
-  capsnap-server restore-backup snapshot-<time> /var/lib/capsnap-restored   # empty or new directory only
+  mkdir pool; for f in pool-from-the-backup-directory/*.age; do         # photos, decrypted once, named by hash
+      age -d -i capsnap-backup-key.txt "$f" > "pool/$(basename "${f%.age}")"; done
+  capsnap-server restore-backup snapshot-<time> /var/lib/capsnap-restored --pool pool   # empty or new directory only
   ```
+
+  The restore checks every photo in `pool` against the hash in the manifest before it writes anything. A snapshot
+  made before 2026-10-04 holds its own photos and needs no `--pool`.
 
   It prints what came back (organizations, captures, photos). Photos retention had already removed stay gone.
   Restoring onto the live box is a deliberate manual step: stop `capsnap`, move the old data aside, restore into

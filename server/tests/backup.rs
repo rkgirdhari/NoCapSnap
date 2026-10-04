@@ -201,3 +201,114 @@ fn the_failure_marker_sits_in_the_data_directory() {
         std::path::Path::new("/var/lib/capsnap").join("BACKUP_FAILED")
     );
 }
+
+/// The photos of a full snapshot as a pool (plain files named by SHA-256) and the set of hashes.
+fn pool_from(full: &std::path::Path, pool: &std::path::Path) -> std::collections::BTreeSet<String> {
+    let m: backup::Manifest =
+        serde_json::from_slice(&std::fs::read(full.join(backup::MANIFEST)).unwrap()).unwrap();
+    std::fs::create_dir_all(pool).unwrap();
+    let mut known = std::collections::BTreeSet::new();
+    for e in m
+        .files
+        .iter()
+        .filter(|e| e.path.starts_with("media/") && !e.external)
+    {
+        std::fs::copy(full.join(&e.path), pool.join(&e.sha256)).unwrap();
+        known.insert(e.sha256.clone());
+    }
+    known
+}
+
+#[tokio::test]
+async fn an_incremental_snapshot_leaves_out_known_photos_and_restores_with_the_pool() {
+    let (w, out) = populated().await;
+    let full = snap(&w, &out).await;
+    let pool = w._dir.path().join("pool");
+    let known = pool_from(&full, &pool);
+    assert_eq!(known.len(), 2);
+
+    // A third photo arrives after the first backup.
+    let app = app(&w);
+    let token = sign_in(&app, "ada@atelier").await;
+    let media = upload_ok(&app, &token, phone_jpeg(64, 48, 3)).await;
+    let r = capture(&app, &token, "three-cccc", &media, &w.loc_a1, None).await;
+    assert!(r.status.is_success());
+
+    let later = chrono::Utc::now() + chrono::TimeDelta::seconds(5);
+    let inc =
+        backup::snapshot_incremental(&w.state.pool, &w.state.cfg.media_dir, &out, later, &known)
+            .await
+            .unwrap();
+    let m = backup::verify(&inc).await.unwrap();
+    assert_eq!(m.files.iter().filter(|e| e.external).count(), 2);
+    let on_disk: usize = std::fs::read_dir(inc.join("media"))
+        .map(|d| d.count())
+        .unwrap_or(0);
+    assert!(
+        (1..3).contains(&on_disk),
+        "only the new photo's directory is copied"
+    );
+
+    // Without the pool a restore says so and writes nothing.
+    let fresh = tempfile::tempdir().unwrap();
+    let data = fresh.path().join("data");
+    let err = backup::restore(&inc, &data).await.unwrap_err();
+    assert!(err.contains("pass the photo pool"), "{err}");
+    assert!(!data.exists());
+
+    // The new photo joins the pool; the restore is then complete.
+    pool_from(&inc, &pool);
+    let r = backup::restore_with_pool(&inc, &data, Some(&pool))
+        .await
+        .unwrap();
+    assert_eq!((r.captures, r.photos, r.photos_missing), (3, 3, 0));
+}
+
+#[tokio::test]
+async fn a_restore_refuses_a_pool_with_a_missing_or_altered_photo_and_writes_nothing() {
+    let (w, out) = populated().await;
+    let full = snap(&w, &out).await;
+    let pool = w._dir.path().join("pool");
+    let known = pool_from(&full, &pool);
+    let later = chrono::Utc::now() + chrono::TimeDelta::seconds(5);
+    let inc =
+        backup::snapshot_incremental(&w.state.pool, &w.state.cfg.media_dir, &out, later, &known)
+            .await
+            .unwrap();
+
+    let victim = pool.join(known.iter().next().unwrap());
+    let original = std::fs::read(&victim).unwrap();
+    let mut bad = original.clone();
+    bad[10] ^= 0xff;
+    std::fs::write(&victim, &bad).unwrap();
+    let fresh = tempfile::tempdir().unwrap();
+    let data = fresh.path().join("data");
+    let err = backup::restore_with_pool(&inc, &data, Some(&pool))
+        .await
+        .unwrap_err();
+    assert!(err.contains("does not match"), "{err}");
+    assert!(!data.exists());
+
+    std::fs::remove_file(&victim).unwrap();
+    let err = backup::restore_with_pool(&inc, &data, Some(&pool))
+        .await
+        .unwrap_err();
+    assert!(err.contains("missing from the pool"), "{err}");
+    assert!(!data.exists());
+}
+
+#[tokio::test]
+async fn a_manifest_cannot_mark_the_database_as_external() {
+    let (w, out) = populated().await;
+    let dir = snap(&w, &out).await;
+    let mut m: backup::Manifest =
+        serde_json::from_slice(&std::fs::read(dir.join(backup::MANIFEST)).unwrap()).unwrap();
+    m.files
+        .iter_mut()
+        .find(|e| e.path == backup::DB_FILE)
+        .unwrap()
+        .external = true;
+    std::fs::write(dir.join(backup::MANIFEST), serde_json::to_vec(&m).unwrap()).unwrap();
+    let err = backup::verify(&dir).await.unwrap_err();
+    assert!(err.contains("cannot be external"), "{err}");
+}
