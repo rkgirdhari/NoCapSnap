@@ -332,7 +332,10 @@ async fn session_sign_in(
 
 /// Where the privacy policy lives for a given server address: the server's own `/privacy` page.
 fn privacy_url(server_url: &str) -> Result<String, capsnap_sync::SyncError> {
-    Ok(format!("{}/privacy", capsnap_sync::check_server_url(server_url)?))
+    Ok(format!(
+        "{}/privacy",
+        capsnap_sync::check_server_url(server_url)?
+    ))
 }
 
 /// Opens the server's privacy policy in the phone's browser. Rust opens it, from the address the
@@ -345,7 +348,9 @@ async fn open_privacy_policy(app: AppHandle, state: State<'_, AppState>) -> CmdR
         .setting(Setting::ServerUrl)
         .await
         .map_err(text)?
-        .ok_or_else(|| "sign in to a server first; the privacy policy is on its web address".to_string())?;
+        .ok_or_else(|| {
+            "sign in to a server first; the privacy policy is on its web address".to_string()
+        })?;
     let url = privacy_url(&server).map_err(text)?;
     app.opener().open_url(url, None::<&str>).map_err(text)
 }
@@ -575,8 +580,14 @@ mod tests {
 
     #[test]
     fn privacy_url_is_the_servers_privacy_page() {
-        assert_eq!(privacy_url("https://capsnap.example.com/ ").unwrap(), "https://capsnap.example.com/privacy");
-        assert_eq!(privacy_url("http://10.0.2.2:8080").unwrap(), "http://10.0.2.2:8080/privacy");
+        assert_eq!(
+            privacy_url("https://capsnap.example.com/ ").unwrap(),
+            "https://capsnap.example.com/privacy"
+        );
+        assert_eq!(
+            privacy_url("http://10.0.2.2:8080").unwrap(),
+            "http://10.0.2.2:8080/privacy"
+        );
     }
 
     #[test]
