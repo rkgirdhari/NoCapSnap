@@ -41,6 +41,7 @@ const noDevice: Bridge = {
   selftest: unavailable,
   simulateAck: unavailable,
   signIn: unavailable,
+  openPrivacyPolicy: unavailable,
   signOut: unavailable,
   refreshSession: unavailable,
   chooseLocation: unavailable,
