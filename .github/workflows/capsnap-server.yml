@@ -71,7 +71,8 @@ jobs:
         run: |
           command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }
           shellcheck deploy/*.sh
-          shellcheck -s sh deploy/bin/*
+          shellcheck -s sh deploy/bin/capsnap-release deploy/bin/capsnapctl
+          shellcheck deploy/bin/capsnap-backup   # bash, by its shebang
 
   build:
     name: Build (static x86_64 musl)
