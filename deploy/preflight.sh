@@ -109,15 +109,28 @@ if [ -d /var/lib/capsnap ]; then info "data directory /var/lib/capsnap exists: $
 # DNS for the guest domain (G1)
 if [ -n "$DOMAIN" ]; then
     resolved=$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{ print $1 }' | sort -u)
+    # AAAA records count too: Let's Encrypt tries IPv6 first. getent hides them on a box without IPv6, so ask
+    # through python3 (always on Ubuntu, and certbot needs it).
+    resolved6=""
+    if have python3; then
+        resolved6=$(python3 -c 'import socket, sys
+try:
+    print("\n".join(sorted({a[4][0] for a in socket.getaddrinfo(sys.argv[1], None, socket.AF_INET6)})))
+except OSError:
+    pass' "$DOMAIN")
+    fi
     if [ -z "$resolved" ]; then
         bad "DNS: $DOMAIN does not resolve yet; add an A record pointing at this box"
     else
         local_ips=$(hostname -I 2>/dev/null | tr ' ' '\n')
-        match=no
-        for ip in $resolved; do
-            if printf '%s\n' "$local_ips" | grep -qx "$ip"; then match=yes; fi
+        ours="" others=""
+        for ip in $resolved $resolved6; do
+            if printf '%s\n' "$local_ips" | grep -qx "$ip"; then ours="$ours $ip"; else others="$others $ip"; fi
         done
-        if [ "$match" = yes ]; then ok "DNS: $DOMAIN points at this box"
+        # Every address must be this box: with an extra record, Let's Encrypt and guests reach the other
+        # address part of the time (seen on the owner's domain, where an old record stayed published).
+        if [ -n "$ours" ] && [ -z "$others" ]; then ok "DNS: $DOMAIN points at this box"
+        elif [ -n "$ours" ]; then bad "DNS: $DOMAIN also points at$others, which is not this box; delete that record first"
         else warn "DNS: $DOMAIN resolves, but not to an address on this box (fine behind NAT; otherwise fix the A record)"; fi
     fi
 else
