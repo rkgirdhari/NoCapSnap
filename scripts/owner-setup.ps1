@@ -249,8 +249,9 @@ switch ($Step) {
     }
 
     'Smoke' {
-        $bash = (Get-Command bash -ErrorAction SilentlyContinue)
-        if (-not $bash) { $bash = Get-Item "$env:ProgramFiles\Git\bin\bash.exe" -ErrorAction SilentlyContinue }
+        # Prefer Git Bash: a bash on PATH is often WSL's launcher, which cannot see C: paths the same way.
+        $bash = Get-Item "$env:ProgramFiles\Git\bin\bash.exe" -ErrorAction SilentlyContinue
+        if (-not $bash) { $bash = Get-Command bash -ErrorAction SilentlyContinue }
         if (-not $bash) { throw 'bash not found; install Git for Windows (it provides Git Bash), or run smoke.sh in WSL.' }
         $exe = if ($bash -is [System.Management.Automation.ApplicationInfo]) { $bash.Source } else { $bash.FullName }
         & $exe (Join-Path $root 'deploy\smoke.sh') $Domain
