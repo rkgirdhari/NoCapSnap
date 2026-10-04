@@ -58,9 +58,12 @@ sensitive data is not involved; Spec §6's "only CAMERA" is about sensitive perm
    replaced, password replaced by a hash of a random value, deactivated, sessions and location links deleted). The
    captures and consent records that point at the row stay, as the restaurant's records; they now show "Former staff".
    The ONB-1 consent record keeps the site URL and acceptance time. **Built**, `server/tests/remove_staff.rs`.
-2. **No link to the policy in the app.** Settings shows the server address but not the policy. Opening a page needs the
-   Tauri opener, which the app does not have; adding it changes the app's capabilities and needs its own review.
-   **Specified**, not built.
+2. **Link to the policy in the app: built.** Settings has "Read the privacy policy" (enabled once signed in). It calls
+   one Rust command, `open_privacy_policy`, which builds `<signed-in server>/privacy` (https, or http only to this
+   phone or the emulator host) and opens it in the phone's browser through `tauri-plugin-opener`. The plugin is
+   registered but **no opener permission is granted**: the capability file stays `core:default`, so the WebView cannot
+   open any address itself. The Play store listing link still waits on P1 and the live domain. **Built**; the address
+   check is unit-tested, opening the browser is untested until the next device check.
 3. **The contact is not set.** Until P2 is answered, `/privacy` says so in plain words.
 4. **Server-side retention does not cover backups.** The policy says backups keep up to 30 days (W4a). That is only true
    once the backup timer is on; if backups are never switched on, that line is harmless but inaccurate.

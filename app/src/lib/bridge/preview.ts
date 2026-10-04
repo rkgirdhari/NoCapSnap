@@ -160,6 +160,10 @@ export function createPreviewBridge(): Bridge {
       displayName = "Maya";
       return { profile: { ...profile }, locations: [serverLocation] };
     },
+    async openPrivacyPolicy() {
+      if (!profile.serverUrl) throw new Error("sign in to a server first; the privacy policy is on its web address");
+      window.open(`${profile.serverUrl.replace(/\/+$/, "")}/privacy`, "_blank", "noopener");
+    },
     async signOut() {
       profile = signedOut();
       notify();

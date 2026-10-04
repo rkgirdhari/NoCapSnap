@@ -330,6 +330,31 @@ async fn session_sign_in(
     })
 }
 
+/// Where the privacy policy lives for a given server address: the server's own `/privacy` page.
+fn privacy_url(server_url: &str) -> Result<String, capsnap_sync::SyncError> {
+    Ok(format!(
+        "{}/privacy",
+        capsnap_sync::check_server_url(server_url)?
+    ))
+}
+
+/// Opens the server's privacy policy in the phone's browser. Rust opens it, from the address the
+/// app is signed in to: the WebView gets no opener permission and cannot open any other address.
+#[tauri::command]
+async fn open_privacy_policy(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let server = state
+        .store
+        .setting(Setting::ServerUrl)
+        .await
+        .map_err(text)?
+        .ok_or_else(|| {
+            "sign in to a server first; the privacy policy is on its web address".to_string()
+        })?;
+    let url = privacy_url(&server).map_err(text)?;
+    app.opener().open_url(url, None::<&str>).map_err(text)
+}
+
 #[tauri::command]
 async fn session_sign_out(state: State<'_, AppState>) -> CmdResult<ProfileDto> {
     capsnap_sync::sign_out(&state.store).await.map_err(text)?;
@@ -479,6 +504,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_set_name,
         menu_list,
         session_sign_in,
+        open_privacy_policy,
         session_sign_out,
         session_refresh,
         session_choose_location,
@@ -501,6 +527,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_set_name,
         menu_list,
         session_sign_in,
+        open_privacy_policy,
         session_sign_out,
         session_refresh,
         session_choose_location,
@@ -516,6 +543,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
@@ -544,4 +572,28 @@ pub fn run() {
         .invoke_handler(handlers())
         .run(tauri::generate_context!())
         .expect("error while running CapSnap");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::privacy_url;
+
+    #[test]
+    fn privacy_url_is_the_servers_privacy_page() {
+        assert_eq!(
+            privacy_url("https://capsnap.example.com/ ").unwrap(),
+            "https://capsnap.example.com/privacy"
+        );
+        assert_eq!(
+            privacy_url("http://10.0.2.2:8080").unwrap(),
+            "http://10.0.2.2:8080/privacy"
+        );
+    }
+
+    #[test]
+    fn privacy_url_refuses_other_addresses() {
+        assert!(privacy_url("http://evil.example.com").is_err());
+        assert!(privacy_url("javascript:alert(1)").is_err());
+        assert!(privacy_url("").is_err());
+    }
 }

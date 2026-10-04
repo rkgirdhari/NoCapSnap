@@ -25,6 +25,17 @@
   let locations = $state<RemoteLocation[]>([]);
   let syncing = $state(false);
 
+  let privacyNote = $state<string | null>(null);
+
+  async function openPrivacy() {
+    privacyNote = null;
+    try {
+      await bridge.openPrivacyPolicy();
+    } catch (e) {
+      privacyNote = message(e);
+    }
+  }
+
   const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
   onMount(async () => {
@@ -241,6 +252,9 @@
         Before a photo is saved, this phone resizes it to 2048 px and removes its location and camera data. No guest
         names, emails or phone numbers are ever collected.
       </p>
+      <button class="btn outline" onclick={openPrivacy} disabled={!profile?.serverUrl}>Read the privacy policy</button>
+      {#if privacyNote}<p class="note bad" role="status">{privacyNote}</p>{/if}
+      {#if !profile?.serverUrl}<p class="note muted">Sign in to a server to read its privacy policy.</p>{/if}
     </div>
   </section>
 

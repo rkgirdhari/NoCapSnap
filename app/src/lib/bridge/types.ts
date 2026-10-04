@@ -98,6 +98,8 @@ export interface Bridge {
   media(sha256: string, thumb: boolean): Promise<Blob>;
   selftest(): Promise<string>;
   signIn(serverUrl: string, login: string, password: string): Promise<Session>;
+  /** Opens the server's /privacy page in the phone's browser (Rust builds the address; needs a server). */
+  openPrivacyPolicy(): Promise<void>;
   signOut(): Promise<Profile>;
   refreshSession(): Promise<Session>;
   chooseLocation(locationId: string): Promise<Profile>;
