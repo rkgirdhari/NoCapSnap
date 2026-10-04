@@ -14,6 +14,7 @@
   BoxPrep      packages, firewall, key-only logins on a freshly installed box (asks before each change)
   Deploy       copy the deploy kit, run preflight, then (after you confirm) install
   Smoke        run smoke.sh against the live domain
+  ClaudeUser   make a non-root user on the box (key login only, no sudo) with Node and Claude Code, for working there
 
   What it never does: it never reinstalls or wipes the VPS (that is the ZAP panel, your step),
   never changes DNS, and never reads or types a password for you. ssh-keygen, ssh, keytool and
@@ -27,13 +28,14 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Check', 'Dns', 'SshKey', 'BackupKey', 'UploadKey', 'Binary', 'BoxPrep', 'Deploy', 'Smoke')]
+    [ValidateSet('Check', 'Dns', 'SshKey', 'BackupKey', 'UploadKey', 'Binary', 'BoxPrep', 'Deploy', 'Smoke', 'ClaudeUser')]
     [string] $Step,
 
     [string] $Box = '5.249.163.79',
     [string] $User = 'root',
     [string] $Domain = 'nocapsnap.hammurabi.click',
     [string] $Repo = 'rkgirdhari/NoCapSnap',
+    [string] $ClaudeUser = 'hcc', # ClaudeUser: the non-root user to create on the box
 
     [switch] $InstallKey,   # SshKey: copy the public key to the box (ssh asks for the root password once)
     [switch] $PushRecipients, # BackupKey: put the PUBLIC key on the box as /etc/capsnap/backup.recipients
@@ -256,6 +258,34 @@ switch ($Step) {
         $exe = if ($bash -is [System.Management.Automation.ApplicationInfo]) { $bash.Source } else { $bash.FullName }
         & $exe (Join-Path $root 'deploy\smoke.sh') $Domain
         if ($LASTEXITCODE -ne 0) { throw 'smoke.sh reported a failure' }
+    }
+
+    'ClaudeUser' {
+        Need ssh 'Add the Windows optional feature "OpenSSH Client".'
+        if ($ClaudeUser -notmatch '^[a-z][a-z0-9_-]{1,30}$') { throw "bad user name: $ClaudeUser" }
+        if (-not (Test-Path "$keyPath.pub")) { throw 'no public key yet; run -Step SshKey first' }
+        if (-not (Test-KeyLogin)) { throw "key login to $target does not work (load the key with ssh-add first)" }
+        $pub = (Get-Content "$keyPath.pub" -Raw).Trim()
+        if ($pub -notmatch '^ssh-ed25519 [A-Za-z0-9+/=]+( [A-Za-z0-9@._-]+)?$') { throw 'the public key is not a plain ed25519 line' }
+
+        Warn "Creates user '$ClaudeUser' on ${Box}: key login only, NO sudo. Installs git, tmux, curl, unzip, nodejs and Claude Code. Root login (for the CapSnap deploy kit) and sshd, ufw and nginx are untouched."
+        if (-not (Confirm-Step 'Go ahead?')) { break }
+        # The script is sent over ssh's stdin; Windows line endings would break bash.
+        $script = (Get-Content (Join-Path $root 'scripts\box-claude-user.sh') -Raw) -replace "`r", ''
+        $script | & ssh -o BatchMode=yes $target "bash -s -- '$pub' '$ClaudeUser'"
+        if ($LASTEXITCODE -ne 0) { throw 'the box script failed' }
+
+        Say "Add this to $env:USERPROFILE\.ssh\config, then run: ssh capsnap-dev"
+        Write-Host @"
+
+Host capsnap-dev
+  HostName $Box
+  User $ClaudeUser
+  IdentityFile ~/.ssh/id_ed25519
+  ServerAliveInterval 30
+
+"@
+        Say "On the box: tmux new -s work, then claude (it asks you to sign in the first time)."
     }
 }
 

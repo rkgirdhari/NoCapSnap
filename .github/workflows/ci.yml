@@ -139,4 +139,4 @@ jobs:
       - uses: actions/checkout@v7
       - run: scripts/check-data-safety.sh
       - name: shellcheck
-        run: command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }; shellcheck scripts/check-data-safety.sh
+        run: command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }; shellcheck scripts/check-data-safety.sh scripts/box-claude-user.sh
