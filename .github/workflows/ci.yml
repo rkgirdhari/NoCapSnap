@@ -2,6 +2,7 @@
 #   rust   fmt, clippy and tests for the store, sync and ONB-1 crates (the server has its own workflow,
 #          capsnap-server.yml, which also builds the release binary and rehearses the deploy kit)
 #   app    the staff app UI (svelte-check, production build, no preview bridge in it) and its Rust shell
+#   data-safety  the app still matches the Play Data Safety draft (W5a)
 #   audit  dependencies: security advisories, licenses compatible with proprietary use (deny.toml),
 #          trusted sources only, and npm advisories for the app's runtime packages
 name: CI
@@ -127,3 +128,15 @@ jobs:
         run: |
           corepack enable
           pnpm audit --prod --audit-level high
+
+  # W5a: the Play Data Safety draft must stay true. Fails when the app gains a permission,
+  # hardware feature or remote CSP origin the draft doesn't declare.
+  data-safety:
+    name: Data Safety declarations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/check-data-safety.sh
+      - name: shellcheck
+        run: command -v shellcheck >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q shellcheck; }; shellcheck scripts/check-data-safety.sh

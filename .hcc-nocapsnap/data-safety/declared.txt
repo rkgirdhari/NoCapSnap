@@ -1,0 +1,10 @@
+# What the Play Data Safety draft (W5a-data-safety-draft.md) was written against.
+# scripts/check-data-safety.sh compares this with the app. If it fails, the app changed:
+# update the draft first, then this file, in the same pull request.
+permission android.permission.ACCESS_NETWORK_STATE
+permission android.permission.CAMERA
+permission android.permission.INTERNET
+feature android.hardware.camera
+feature android.hardware.camera.any
+csp-connect ipc: http://ipc.localhost
+csp-origins none

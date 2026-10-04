@@ -72,6 +72,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/guest/photo", get(guest::photo))
         .route("/api/v1/guest/feedback", post(guest::submit))
         .route("/api/v1/onboarding/import", post(onboarding::import))
+        .route("/privacy", get(portal::privacy))
         .route("/g", get(portal::redirect))
         .route("/g/", get(portal::index))
         .route("/g/portal.js", get(portal::script))
@@ -97,7 +98,7 @@ async fn harden(State(_): State<AppState>, req: Request, next: Next) -> Response
         .get::<MatchedPath>()
         .map(|p| p.as_str().to_owned())
         .unwrap_or_else(|| "unmatched".into());
-    let portal = route.starts_with("/g");
+    let portal = route.starts_with("/g") || route == "/privacy";
     let mut resp = next.run(req).await;
     let h = resp.headers_mut();
     let csp = if portal {
