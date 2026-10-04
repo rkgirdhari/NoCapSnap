@@ -37,6 +37,8 @@ chown "$NAME:$NAME" "/home/$NAME/.ssh/authorized_keys"
 chmod 600 "/home/$NAME/.ssh/authorized_keys"
 
 # Claude Code, installed into the user's own prefix so no sudo is needed.
+# The single quotes are deliberate: ~ and $HOME must expand in the new user's shell, not here.
+# shellcheck disable=SC2016
 su - "$NAME" -c '
     set -e
     mkdir -p ~/.npm-global
