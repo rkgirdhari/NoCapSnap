@@ -1,6 +1,6 @@
 # W4 — Operations hardening (PROPOSAL)
 
-Date: 2026-10-04 · Status: **Specified (proposal only)**. Not opened; waits for the owner and for W3b (a live box to
+Date: 2026-10-04 · Status: **W4a opened** (owner, 2026-10-04; built in this branch, see the table below). W4b waits for B1–B4 and for W3b (a live box to
 back up).
 
 Spec §7 Phase 4: *"Execute the 3-copy encrypted backup plan and perform a full restoration drill."* The runbook adds

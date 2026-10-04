@@ -158,6 +158,35 @@ jobs:
         run: |
           sudo capsnapctl create-org ci "CI Bistro"
           sudo capsnapctl create-location ci "CI Bistro" Europe/Berlin
+      - name: Backup, restore and the backup-failure pause (W4a)
+        run: |
+          sudo apt-get install -y -q age
+          age-keygen -o "$RUNNER_TEMP/backup-key.txt" 2>/dev/null
+          age-keygen -y "$RUNNER_TEMP/backup-key.txt" | sudo tee /etc/capsnap/backup.recipients >/dev/null
+          sudo chgrp capsnap /etc/capsnap/backup.recipients && sudo chmod 640 /etc/capsnap/backup.recipients
+          sudo systemd-analyze verify /etc/systemd/system/capsnap-backup.service /etc/systemd/system/capsnap-backup.timer
+          sudo systemctl start capsnap-backup.service
+          sudo capsnap-backup status
+          sudo test ! -e /var/lib/capsnap/BACKUP_FAILED
+          # Decrypt with the private key (never on the box in real life), verify, restore.
+          f=$(sudo sh -c 'ls /var/lib/capsnap-backup/snapshot-*.tar.age | head -n 1')
+          mkdir "$RUNNER_TEMP/unpack" && age -d -i "$RUNNER_TEMP/backup-key.txt" <(sudo cat "$f") | tar -C "$RUNNER_TEMP/unpack" -xf -
+          snap=$(ls -d "$RUNNER_TEMP"/unpack/snapshot-*)
+          sudo /var/www/capsnap/current/capsnap-server verify-backup "$snap"
+          sudo /var/www/capsnap/current/capsnap-server restore-backup "$snap" "$RUNNER_TEMP/restored" | tee restored.txt
+          grep -q 'organizations: 1' restored.txt
+          # A broken backup must raise the marker, pause retention and release switches, and clear on success.
+          sudo cp /etc/capsnap/backup.recipients "$RUNNER_TEMP/recipients.good"
+          : | sudo tee /etc/capsnap/backup.recipients >/dev/null
+          if sudo systemctl start capsnap-backup.service; then echo "::error::a backup with no key succeeded"; exit 1; fi
+          sudo test -e /var/lib/capsnap/BACKUP_FAILED
+          if sudo capsnapctl retention; then echo "::error::retention ran while the backup was failing"; exit 1; fi
+          if sudo capsnap-release activate "$(readlink -f /var/www/capsnap/current)"; then echo "::error::a release switch was allowed"; exit 1; fi
+          sudo cp "$RUNNER_TEMP/recipients.good" /etc/capsnap/backup.recipients
+          sudo chgrp capsnap /etc/capsnap/backup.recipients && sudo chmod 640 /etc/capsnap/backup.recipients
+          sudo systemctl start capsnap-backup.service
+          sudo test ! -e /var/lib/capsnap/BACKUP_FAILED
+          sudo capsnapctl retention
       - name: A release that fails is rolled back
         run: |
           bad=/var/www/capsnap/releases/20000101000000-broken

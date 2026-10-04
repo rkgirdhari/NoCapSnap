@@ -1,0 +1,65 @@
+#!/bin/bash
+# capsnap-backup: one encrypted snapshot of the CapSnap data (W4a, Spec §7 Phase 4).
+# Installed as /usr/local/sbin/capsnap-backup and run daily by capsnap-backup.timer as
+# the `capsnap` user. Copy 1 of the three lives in /var/lib/capsnap-backup; copies 2 and 3
+# are W4b (the owner's hardware).
+#
+#   capsnap-backup run       snapshot, verify, encrypt, checksum, prune
+#   capsnap-backup status    age of the last good backup; exits 1 when older than 36 hours
+#
+# The box holds only the PUBLIC half of the key (/etc/capsnap/backup.recipients, one `age`
+# recipient per line), so it can write backups but never read them. Any failure creates
+# /var/lib/capsnap/BACKUP_FAILED, which pauses retention and release switches until the
+# next successful run (Spec §7: Backup failure).
+set -eEuo pipefail
+
+BIN=${CAPSNAP_BIN:-/var/www/capsnap/current/capsnap-server}
+DATA=${CAPSNAP_DATA_DIR:-/var/lib/capsnap}
+DEST=${CAPSNAP_BACKUP_DIR:-/var/lib/capsnap-backup}
+RECIPIENTS=${CAPSNAP_BACKUP_RECIPIENTS:-/etc/capsnap/backup.recipients}
+KEEP_DAYS=${CAPSNAP_BACKUP_KEEP_DAYS:-30}   # photos live 30 days (Spec §6); so do backups
+STALE_HOURS=36
+MARKER=$DATA/BACKUP_FAILED
+
+fail() {
+    echo "capsnap-backup: $*" >&2
+    : >"$MARKER" || true
+    exit 1
+}
+trap 'fail "unexpected error on line $LINENO"' ERR
+
+status() {
+    [ -f "$DEST/LAST_GOOD" ] || { echo "capsnap-backup: no good backup yet" >&2; exit 1; }
+    age=$(($(date +%s) - $(date -u -d "$(cat "$DEST/LAST_GOOD")" +%s)))
+    echo "last good backup: $(cat "$DEST/LAST_GOOD") ($((age / 3600)) hours ago)"
+    [ "$age" -le $((STALE_HOURS * 3600)) ] || { echo "capsnap-backup: older than $STALE_HOURS hours" >&2; exit 1; }
+    [ ! -e "$MARKER" ] || { echo "capsnap-backup: the last run failed ($MARKER exists)" >&2; exit 1; }
+}
+
+run() {
+    [ -s "$RECIPIENTS" ] || fail "$RECIPIENTS is missing or empty (the public key to encrypt to)"
+    command -v age >/dev/null || fail "age is not installed (apt install age)"
+    umask 077
+    mkdir -p "$DEST"
+    stage=$(mktemp -d "$DEST/.stage.XXXXXX")
+    trap 'rm -rf "$stage"' EXIT
+
+    snap=$("$BIN" backup "$stage")
+    "$BIN" verify-backup "$snap" >/dev/null
+    name=$(basename "$snap")
+
+    tar -C "$stage" -cf - "$name" | age -R "$RECIPIENTS" -o "$DEST/$name.tar.age.partial"
+    mv "$DEST/$name.tar.age.partial" "$DEST/$name.tar.age"
+    (cd "$DEST" && sha256sum "$name.tar.age" >"$name.tar.age.sha256" && sha256sum -c --quiet "$name.tar.age.sha256")
+
+    find "$DEST" -maxdepth 1 -name 'snapshot-*.tar.age*' -mtime "+$KEEP_DAYS" -delete
+    date -u +%Y-%m-%dT%H:%M:%SZ >"$DEST/LAST_GOOD"
+    rm -f "$MARKER"
+    echo "capsnap-backup: wrote $DEST/$name.tar.age"
+}
+
+case "${1:-}" in
+    run) run ;;
+    status) status ;;
+    *) sed -n '2,12p' "$0" >&2; exit 2 ;;
+esac

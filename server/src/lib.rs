@@ -4,6 +4,7 @@
 
 pub mod admin;
 pub mod auth;
+pub mod backup;
 pub mod captures;
 pub mod config;
 pub mod db;
@@ -141,10 +142,15 @@ pub async fn serve_listener(
 ) -> std::io::Result<()> {
     tracing::info!(addr = %listener.local_addr()?, "listening");
     let (pool, media) = (state.pool.clone(), state.cfg.media_dir.clone());
+    let marker = backup::marker_path(&state.cfg);
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
         loop {
             tick.tick().await;
+            if marker.exists() {
+                tracing::error!("retention paused: the last backup failed (Spec §7)");
+                continue;
+            }
             match retention::run(&pool, &media, chrono::Utc::now()).await {
                 Ok(r) => tracing::info!(?r, "retention"),
                 Err(e) => tracing::error!(error = %e, "retention failed"),

@@ -102,6 +102,9 @@ case "$cmd" in
             *) die "releases live under $ROOT/releases/" ;;
         esac
         [ -x "$new/capsnap-server" ] || die "$new/capsnap-server is missing or not executable"
+        if [ -e "${CAPSNAP_DATA_DIR:-/var/lib/capsnap}/BACKUP_FAILED" ]; then
+            die "the last backup failed, so release switches are paused (Spec §7). Fix the backup, run capsnap-backup run, then retry (rollback is still allowed)"
+        fi
         switch_to "$new"
         ;;
     rollback)

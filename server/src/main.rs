@@ -3,7 +3,7 @@
 use std::io::Read;
 use std::process::ExitCode;
 
-use capsnap_server::{AppState, Config, admin, retention};
+use capsnap_server::{AppState, Config, admin, backup, retention};
 
 const USAGE: &str = "usage:
   capsnap-server serve
@@ -15,6 +15,9 @@ const USAGE: &str = "usage:
   capsnap-server import-menu <location-id> <menu.json>   ([{\"name\":…,\"category\":…}, …])
   capsnap-server revoke-sessions <login>
   capsnap-server retention
+  capsnap-server backup <out-dir>             (a consistent snapshot; prints its path)
+  capsnap-server verify-backup <snapshot-dir>
+  capsnap-server restore-backup <snapshot-dir> <new-data-dir>   (into an empty directory only)
 
 environment: CAPSNAP_PUBLIC_BASE_URL (required), CAPSNAP_DATA_DIR (./data), CAPSNAP_BIND (127.0.0.1:8080)";
 
@@ -44,6 +47,28 @@ async fn main() -> ExitCode {
 async fn run(args: &[String]) -> Result<String, String> {
     if matches!(args, [a] if a == "version") {
         return Ok(format!("capsnap-server {}", env!("CARGO_PKG_VERSION")));
+    }
+    // These two need no running server or settings: they work on a snapshot directory.
+    match args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        ["verify-backup", dir] => {
+            let m = backup::verify(std::path::Path::new(dir)).await?;
+            return Ok(format!(
+                "ok: {} files, created {}",
+                m.files.len(),
+                m.created_at
+            ));
+        }
+        ["restore-backup", dir, data_dir] => {
+            let r =
+                backup::restore(std::path::Path::new(dir), std::path::Path::new(data_dir)).await?;
+            return Ok(format!("{r:?}"));
+        }
+        _ => {}
     }
     let cfg = Config::from_env()?;
     let state = AppState::open(cfg)
@@ -78,6 +103,18 @@ async fn run(args: &[String]) -> Result<String, String> {
         ["revoke-sessions", login] => admin::revoke_sessions(pool, login)
             .await
             .map(|n| format!("{n} sessions revoked")),
+        ["backup", out_dir] => backup::snapshot(
+            pool,
+            &state.cfg.media_dir,
+            std::path::Path::new(out_dir),
+            chrono::Utc::now(),
+        )
+        .await
+        .map(|p| p.display().to_string()),
+        ["retention"] if backup::marker_path(&state.cfg).exists() => Err(format!(
+            "retention is paused: {} exists because the last backup failed. Fix the backup first (Spec §7)",
+            backup::marker_path(&state.cfg).display()
+        )),
         ["retention"] => retention::run(pool, &state.cfg.media_dir, chrono::Utc::now())
             .await
             .map(|r| format!("{r:?}"))

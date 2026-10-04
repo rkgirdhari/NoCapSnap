@@ -1,0 +1,13 @@
+# Daily CapSnap backup (W4a). Installed by deploy/install.sh; enabled once
+# /etc/capsnap/backup.recipients exists.
+
+[Unit]
+Description=Daily CapSnap encrypted backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
