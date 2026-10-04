@@ -4,7 +4,7 @@ Updated 2026-10-04. Gate status lives in the table in [README.md](README.md); th
 
 ## Yours (the owner)
 
-**Deploy (W3b)** — [checklist](.hcc-nocapsnap/protocol/W3b-owner-checklist.md)
+**Deploy (W3b)** — [checklist](.hcc-nocapsnap/protocol/W3b-owner-checklist.md); most steps have a script: `scripts/owner-setup.ps1` (run `-Step Check` first)
 - [ ] Back up the IIS site(s) on the VPS, with their bindings
 - [ ] DNS: drop the VPS records for `hcc.software` / `www` (unless that site moves), drop the Manus record for `nocapsnap.hammurabi.click`
 - [ ] Reinstall Ubuntu 24.04 in the ZAP panel, outside the 7 October 05:00–11:00 window, with your public key
