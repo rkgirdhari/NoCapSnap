@@ -6,11 +6,12 @@
 #   capsnapctl create-location atelier "Atelier No. 8" Europe/Berlin
 #   read -rs PW && printf '%s\n' "$PW" | capsnapctl create-staff atelier ada@atelier Ada admin
 #   capsnapctl revoke-sessions ada@atelier
+#   capsnapctl remove-staff ada@atelier      # on request: anonymise the account, keep its captures
 set -eu
 ENV_FILE=${CAPSNAP_ENV_FILE:-/etc/capsnap/capsnap.env}
 BIN=${CAPSNAP_BIN:-/var/www/capsnap/current/capsnap-server}
 [ "$(id -u)" -eq 0 ] || { echo "capsnapctl: run as root" >&2; exit 1; }
-[ $# -gt 0 ] || { sed -n '2,10p' "$0" >&2; exit 2; }
+[ $# -gt 0 ] || { sed -n '2,11p' "$0" >&2; exit 2; }
 set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"

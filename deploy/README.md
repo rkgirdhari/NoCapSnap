@@ -136,6 +136,7 @@ It needs these repository settings:
 | Server logs (30 days) | `journalctl --namespace=capsnap` |
 | Start and stop messages | `journalctl -u capsnap` |
 | A lost phone | `capsnapctl revoke-sessions <login>` |
+| A staff member asks for their data to be removed | `capsnapctl remove-staff <login>`: anonymises the account, deletes its sessions, keeps their captures |
 | Restart | `systemctl restart capsnap` |
 
 ## Backups (W4a: copy 1 of 3)
