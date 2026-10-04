@@ -171,6 +171,40 @@ async fn receive(body: Body, tmp: &Path, max: usize) -> ApiResult<(String, usize
     Ok((hex::encode(hasher.finalize()), total))
 }
 
+/// `from` is the first byte of the entropy-coded data. Skips it (stuffed `FF 00` and
+/// restart markers belong to it) and requires the next marker to be EOI, at the very
+/// end of the file: any other segment, or any byte after EOI, could carry hidden data.
+fn reject_extra_after_scan(data: &[u8], from: usize) -> ApiResult<()> {
+    let mut at = from;
+    while at + 1 < data.len() {
+        if data[at] != 0xFF {
+            at += 1;
+            continue;
+        }
+        match data[at + 1] {
+            0x00 | 0xD0..=0xD7 => at += 2,
+            0xFF => at += 1, // fill byte before a marker
+            0xD9 if at + 2 == data.len() => return Ok(()),
+            0xD9 => {
+                return Err(ApiError::unprocessable(
+                    "metadata_present",
+                    "the photo has extra data after its end",
+                ));
+            }
+            _ => {
+                return Err(ApiError::unprocessable(
+                    "metadata_present",
+                    "the photo has extra segments after its image data",
+                ));
+            }
+        }
+    }
+    Err(ApiError::unprocessable(
+        "undecodable",
+        "the photo could not be read",
+    ))
+}
+
 /// The server's own check that the phone did its job (Spec §3, §5): a
 /// baseline JPEG whose only header segment besides tables is a plain JFIF
 /// APP0 without a thumbnail, that decodes completely, at ≤ 2048 px.
@@ -189,12 +223,15 @@ pub fn validate_jpeg(data: &[u8]) -> ApiResult<(u32, u32)> {
             return Err(bad());
         }
         let marker = data[at + 1];
-        if marker == 0xDA {
-            break; // start of scan: no more header segments
-        }
         let len = usize::from(u16::from_be_bytes([data[at + 2], data[at + 3]]));
         if len < 2 || at + 2 + len > data.len() {
             return Err(bad());
+        }
+        if marker == 0xDA {
+            // Start of scan: no more header segments. What follows must be the
+            // entropy-coded data and the end of the image, nothing else.
+            at += 2 + len;
+            break;
         }
         let segment = &data[at + 4..at + 2 + len];
         match marker {
@@ -215,10 +252,19 @@ pub fn validate_jpeg(data: &[u8]) -> ApiResult<(u32, u32)> {
                     "the photo carries an embedded thumbnail or extension block",
                 ));
             }
+            // Baseline only: a progressive or other multi-scan image can carry segments
+            // between its scans.
+            0xC1..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF => {
+                return Err(ApiError::unprocessable(
+                    "not_baseline",
+                    "the photo must be a baseline JPEG; it must be processed on the phone first",
+                ));
+            }
             _ => {}
         }
         at += 2 + len;
     }
+    reject_extra_after_scan(data, at)?;
     let mut reader = image::ImageReader::new(std::io::Cursor::new(data));
     reader.set_format(image::ImageFormat::Jpeg);
     let mut limits = image::Limits::default();
@@ -234,4 +280,71 @@ pub fn validate_jpeg(data: &[u8]) -> ApiResult<(u32, u32)> {
         ));
     }
     Ok((w, h))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_jpeg;
+
+    fn encoded() -> Vec<u8> {
+        let img = image::RgbImage::from_fn(64, 48, |x, y| image::Rgb([x as u8, y as u8, 7]));
+        let mut out = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut out, image::ImageFormat::Jpeg).unwrap();
+        out.into_inner()
+    }
+
+    fn code(data: &[u8]) -> &'static str {
+        validate_jpeg(data).expect_err("must be refused").code
+    }
+
+    #[test]
+    fn plain_baseline_jpeg_passes() {
+        assert_eq!(validate_jpeg(&encoded()).unwrap(), (64, 48));
+    }
+
+    #[test]
+    fn bytes_after_eoi_are_refused() {
+        let mut data = encoded();
+        data.extend_from_slice(b"hidden gps 41.88,-87.63");
+        assert_eq!(code(&data), "metadata_present");
+        let mut data = encoded();
+        data.extend_from_slice(&[0xFF, 0xD9]); // a second EOI
+        assert_eq!(code(&data), "metadata_present");
+    }
+
+    #[test]
+    fn segment_between_scan_and_eoi_is_refused() {
+        let mut data = encoded();
+        let eoi = data.len() - 2;
+        let mut app1 = vec![0xFF, 0xE1, 0x00, 0x10];
+        app1.extend_from_slice(b"Exif\0\0MM\0\x2a\0\0\0\x08");
+        data.splice(eoi..eoi, app1);
+        assert_eq!(code(&data), "metadata_present");
+    }
+
+    #[test]
+    fn comment_after_scan_is_refused() {
+        let mut data = encoded();
+        let eoi = data.len() - 2;
+        data.splice(eoi..eoi, [0xFF, 0xFE, 0x00, 0x04, b'h', b'i']);
+        assert_eq!(code(&data), "metadata_present");
+    }
+
+    #[test]
+    fn progressive_jpeg_is_refused() {
+        let mut data = encoded();
+        let sof = data
+            .windows(2)
+            .position(|w| w == [0xFF, 0xC0])
+            .expect("baseline SOF0");
+        data[sof + 1] = 0xC2;
+        assert_eq!(code(&data), "not_baseline");
+    }
+
+    #[test]
+    fn missing_eoi_is_refused() {
+        let mut data = encoded();
+        data.truncate(data.len() - 2);
+        assert_eq!(code(&data), "undecodable");
+    }
 }
