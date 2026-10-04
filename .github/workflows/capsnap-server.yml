@@ -164,17 +164,35 @@ jobs:
           sudo apt-get install -y -q age
           age-keygen -o "$RUNNER_TEMP/backup-key.txt" 2>/dev/null
           age-keygen -y "$RUNNER_TEMP/backup-key.txt" | sudo tee /etc/capsnap/backup.recipients >/dev/null
+          # A stand-in photo in the data directory (the backup copies files; it does not decode them).
+          sudo -u capsnap mkdir -p /var/lib/capsnap/media/ab
+          echo "not really a photo" | sudo -u capsnap tee /var/lib/capsnap/media/ab/ci-photo.jpg >/dev/null
           sudo chgrp capsnap /etc/capsnap/backup.recipients && sudo chmod 640 /etc/capsnap/backup.recipients
           sudo systemd-analyze verify /etc/systemd/system/capsnap-backup.service /etc/systemd/system/capsnap-backup.timer
           sudo systemctl start capsnap-backup.service
           sudo capsnap-backup status
           sudo test ! -e /var/lib/capsnap/BACKUP_FAILED
+          test "$(sudo sh -c 'ls /var/lib/capsnap-backup/pool | wc -l')" = 1
+          # Photos are pooled once; a second backup must not copy them again (W4 incremental copies).
+          sudo sh -c 'ls /var/lib/capsnap-backup/pool | wc -l' | tee pool-count.txt
+          sleep 2   # snapshot names carry the second
+          sudo systemctl start capsnap-backup.service
+          [ "$(sudo sh -c 'ls /var/lib/capsnap-backup/pool | wc -l')" = "$(cat pool-count.txt)" ]
+          test "$(sudo sh -c 'ls /var/lib/capsnap-backup/snapshot-*.tar.age | wc -l')" = 2
           # Decrypt with the private key (never on the box in real life), verify, restore.
           f=$(sudo sh -c 'ls /var/lib/capsnap-backup/snapshot-*.tar.age | head -n 1')
           mkdir "$RUNNER_TEMP/unpack" && age -d -i "$RUNNER_TEMP/backup-key.txt" <(sudo cat "$f") | tar -C "$RUNNER_TEMP/unpack" -xf -
           snap=$(ls -d "$RUNNER_TEMP"/unpack/snapshot-*)
           sudo /var/www/capsnap/current/capsnap-server verify-backup "$snap"
-          sudo /var/www/capsnap/current/capsnap-server restore-backup "$snap" "$RUNNER_TEMP/restored" | tee restored.txt
+          # The photo is not in the archive: it sits in the pool, encrypted once, and the snapshot refers to it.
+          sudo /var/www/capsnap/current/capsnap-server list-backup-photos "$snap" | grep -q ' external$'
+          if sudo /var/www/capsnap/current/capsnap-server restore-backup "$snap" "$RUNNER_TEMP/no-pool"; then echo "::error::restored without the photo pool"; exit 1; fi
+          mkdir "$RUNNER_TEMP/pool"
+          for p in $(sudo sh -c 'ls /var/lib/capsnap-backup/pool'); do
+            age -d -i "$RUNNER_TEMP/backup-key.txt" <(sudo cat "/var/lib/capsnap-backup/pool/$p") >"$RUNNER_TEMP/pool/${p%.age}"
+          done
+          sudo /var/www/capsnap/current/capsnap-server restore-backup "$snap" "$RUNNER_TEMP/restored" --pool "$RUNNER_TEMP/pool" | tee restored.txt
+          sudo test -f "$RUNNER_TEMP/restored/media/ab/ci-photo.jpg"
           grep -q 'organizations: 1' restored.txt
           # A broken backup must raise the marker, pause retention and release switches, and clear on success.
           sudo cp /etc/capsnap/backup.recipients "$RUNNER_TEMP/recipients.good"

@@ -7,8 +7,14 @@
 //! snapshot-20261004T020000Z/
 //!   manifest.json     format, creation time, and the SHA-256 and size of every other file
 //!   capsnap.db        the database, taken with SQLite's own `VACUUM INTO` (never a file copy of a live WAL database)
-//!   media/<key>       the photo files
+//!   media/<key>       the photo files, except the ones marked `external` (see below)
 //! ```
+//!
+//! Photos never change once stored, so a snapshot can leave out a photo a *previous* backup
+//! already holds: the caller passes the SHA-256s it has (`known`), and those photos appear in
+//! the manifest as `external` entries (path, hash, size; no file). Such a snapshot verifies
+//! by itself, but restoring it needs the photos back from wherever they were kept, passed to
+//! `restore_with_pool` as a directory of plain files named by SHA-256.
 //!
 //! A snapshot is built in `<name>.partial` and renamed only when complete, so a
 //! half-written one is never mistaken for a good one. Encryption and the copies
@@ -31,7 +37,9 @@ use crate::config::Config;
 pub const MANIFEST: &str = "manifest.json";
 pub const DB_FILE: &str = "capsnap.db";
 pub const MEDIA_DIR: &str = "media";
-const FORMAT: u32 = 1;
+/// 1: every file is in the snapshot. 2: may hold `external` photo entries.
+const FORMAT: u32 = 2;
+const OLDEST_FORMAT: u32 = 1;
 
 /// Present in the data directory while the last backup failed. Retention (and the
 /// release switch in `capsnap-release`) refuse to run while it exists: Spec §7,
@@ -50,6 +58,13 @@ pub struct Entry {
     pub path: String,
     pub sha256: String,
     pub bytes: u64,
+    /// A photo kept outside this snapshot, by hash (format 2).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub external: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -92,6 +107,7 @@ fn hash_copy(from: &Path, to: &Path) -> Result<Entry, String> {
         path: String::new(),
         sha256: hex::encode(hasher.finalize()),
         bytes,
+        external: false,
     })
 }
 
@@ -143,12 +159,24 @@ fn walk(dir: &Path) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-/// Take a snapshot into `out_dir/snapshot-<UTC time>`; returns that path.
+/// Take a full snapshot into `out_dir/snapshot-<UTC time>`; returns that path.
 pub async fn snapshot(
     pool: &SqlitePool,
     media_dir: &Path,
     out_dir: &Path,
     now: DateTime<Utc>,
+) -> Result<PathBuf, String> {
+    snapshot_incremental(pool, media_dir, out_dir, now, &BTreeSet::new()).await
+}
+
+/// Like `snapshot`, but photos whose SHA-256 is in `known` are listed as `external`
+/// instead of copied.
+pub async fn snapshot_incremental(
+    pool: &SqlitePool,
+    media_dir: &Path,
+    out_dir: &Path,
+    now: DateTime<Utc>,
+    known: &BTreeSet<String>,
 ) -> Result<PathBuf, String> {
     let name = format!("snapshot-{}", now.format("%Y%m%dT%H%M%SZ"));
     let final_dir = out_dir.join(&name);
@@ -157,7 +185,7 @@ pub async fn snapshot(
         return Err(format!("{} already exists", final_dir.display()));
     }
     std::fs::create_dir_all(&partial).map_err(|e| format!("{}: {e}", partial.display()))?;
-    match build(pool, media_dir, &partial, now).await {
+    match build(pool, media_dir, &partial, now, known).await {
         Ok(()) => {
             std::fs::rename(&partial, &final_dir).map_err(|e| e.to_string())?;
             Ok(final_dir)
@@ -174,6 +202,7 @@ async fn build(
     media_dir: &Path,
     dir: &Path,
     now: DateTime<Utc>,
+    known: &BTreeSet<String>,
 ) -> Result<(), String> {
     let mut files = Vec::new();
 
@@ -191,9 +220,28 @@ async fn build(
         path: DB_FILE.into(),
         sha256,
         bytes,
+        external: false,
     });
 
     for rel in walk(media_dir)? {
+        let from = media_dir.join(&rel);
+        // Photos are immutable, so a hash already in `known` is a copy kept elsewhere.
+        if !known.is_empty() {
+            match hash_file(&from) {
+                Ok((sha256, bytes)) if known.contains(&sha256) => {
+                    files.push(Entry {
+                        path: format!("{MEDIA_DIR}/{rel}"),
+                        sha256,
+                        bytes,
+                        external: true,
+                    });
+                    continue;
+                }
+                Ok(_) => {}
+                Err(_) if !from.exists() => continue,
+                Err(e) => return Err(e),
+            }
+        }
         let to = dir.join(MEDIA_DIR).join(&rel);
         match hash_copy(&media_dir.join(&rel), &to) {
             Ok(mut entry) => {
@@ -217,6 +265,12 @@ async fn build(
     f.sync_all().map_err(|e| e.to_string())
 }
 
+fn valid_sha256(s: &str) -> bool {
+    s.len() == 64
+        && s.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
 fn safe_relative(path: &str) -> bool {
     !path.is_empty()
         && Path::new(path)
@@ -233,7 +287,7 @@ pub async fn verify(dir: &Path) -> Result<Manifest, String> {
         .map_err(|e| format!("{}: {e}", dir.join(MANIFEST).display()))?;
     let manifest: Manifest =
         serde_json::from_slice(&raw).map_err(|e| format!("{MANIFEST} is not valid: {e}"))?;
-    if manifest.format != FORMAT {
+    if !(OLDEST_FORMAT..=FORMAT).contains(&manifest.format) {
         return Err(format!("unknown snapshot format {}", manifest.format));
     }
 
@@ -244,6 +298,15 @@ pub async fn verify(dir: &Path) -> Result<Manifest, String> {
         }
         if !listed.insert(entry.path.clone()) {
             return Err(format!("{} is listed twice", entry.path));
+        }
+        if entry.external {
+            if !entry.path.starts_with(&format!("{MEDIA_DIR}/")) {
+                return Err(format!("{} cannot be external", entry.path));
+            }
+            if !valid_sha256(&entry.sha256) {
+                return Err(format!("{} has no valid hash", entry.path));
+            }
+            continue;
         }
         let (sha256, bytes) = hash_file(&dir.join(&entry.path))?;
         if sha256 != entry.sha256 || bytes != entry.bytes {
@@ -300,6 +363,16 @@ async fn check_database(path: &Path) -> Result<(), String> {
 /// must be empty: a restore never overwrites live data. Opens the restored database
 /// (migrations included) and counts what came back.
 pub async fn restore(snapshot_dir: &Path, data_dir: &Path) -> Result<Restored, String> {
+    restore_with_pool(snapshot_dir, data_dir, None).await
+}
+
+/// `restore`, taking `external` photos from `pool_dir`: a directory of plain photo files named
+/// by their SHA-256. Every external photo must be there with the recorded hash, or nothing is written.
+pub async fn restore_with_pool(
+    snapshot_dir: &Path,
+    data_dir: &Path,
+    pool_dir: Option<&Path>,
+) -> Result<Restored, String> {
     let manifest = verify(snapshot_dir).await?;
     match std::fs::read_dir(data_dir) {
         Ok(mut entries) => {
@@ -314,6 +387,31 @@ pub async fn restore(snapshot_dir: &Path, data_dir: &Path) -> Result<Restored, S
         Err(e) => return Err(format!("{}: {e}", data_dir.display())),
     }
 
+    let source_of = |entry: &Entry| -> Result<PathBuf, String> {
+        if !entry.external {
+            return Ok(snapshot_dir.join(&entry.path));
+        }
+        let pool = pool_dir.ok_or_else(|| {
+            format!(
+                "{} is kept outside this snapshot; pass the photo pool",
+                entry.path
+            )
+        })?;
+        Ok(pool.join(&entry.sha256))
+    };
+    // Check the pool before writing anything.
+    for entry in manifest.files.iter().filter(|e| e.external) {
+        let from = source_of(entry)?;
+        let (sha256, bytes) = hash_file(&from)
+            .map_err(|e| format!("photo {} is missing from the pool: {e}", entry.sha256))?;
+        if sha256 != entry.sha256 || bytes != entry.bytes {
+            return Err(format!(
+                "pool photo {} does not match its hash",
+                entry.sha256
+            ));
+        }
+    }
+
     let target = Config::for_dir(data_dir, "https://restore.invalid");
     std::fs::create_dir_all(&target.media_dir).map_err(|e| e.to_string())?;
     for entry in &manifest.files {
@@ -326,7 +424,7 @@ pub async fn restore(snapshot_dir: &Path, data_dir: &Path) -> Result<Restored, S
                 .ok_or_else(|| format!("unexpected file in the manifest: {}", entry.path))?;
             target.media_dir.join(key)
         };
-        let copied = hash_copy(&snapshot_dir.join(&entry.path), &to)?;
+        let copied = hash_copy(&source_of(entry)?, &to)?;
         if copied.sha256 != entry.sha256 {
             return Err(format!("{} changed while it was restored", entry.path));
         }
