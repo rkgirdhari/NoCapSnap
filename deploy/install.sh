@@ -124,8 +124,17 @@ install -m 0644 "$HERE/systemd/capsnap.service" /etc/systemd/system/capsnap.serv
 install -m 0644 "$HERE/systemd/journald@capsnap.conf" /etc/systemd/journald@capsnap.conf
 install -m 0755 "$HERE/bin/capsnap-release" /usr/local/sbin/capsnap-release
 install -m 0755 "$HERE/bin/capsnapctl" /usr/local/sbin/capsnapctl
+install -m 0755 "$HERE/bin/capsnap-backup" /usr/local/sbin/capsnap-backup
+install -m 0644 "$HERE/systemd/capsnap-backup.service" /etc/systemd/system/capsnap-backup.service
+install -m 0644 "$HERE/systemd/capsnap-backup.timer" /etc/systemd/system/capsnap-backup.timer
 systemctl daemon-reload
 systemctl enable capsnap.service >/dev/null
+# The backup timer runs only once the owner has put the PUBLIC backup key on the box (W4a).
+if [ -s "$ETC/backup.recipients" ]; then
+    systemctl enable --now capsnap-backup.timer >/dev/null
+else
+    say "backups are off: put an age public key in $ETC/backup.recipients, then re-run install.sh"
+fi
 
 # --- nginx --------------------------------------------------------------------------
 

@@ -46,7 +46,7 @@ root on the box unless marked otherwise.
 
    ```bash
    apt update && apt full-upgrade -y
-   apt install -y nginx certbot ufw unattended-upgrades
+   apt install -y nginx certbot ufw unattended-upgrades age
    dpkg-reconfigure -plow unattended-upgrades     # answer Yes: security updates install themselves
    ```
 
@@ -138,6 +138,32 @@ It needs these repository settings:
 | A lost phone | `capsnapctl revoke-sessions <login>` |
 | Restart | `systemctl restart capsnap` |
 
+## Backups (W4a: copy 1 of 3)
+
+A daily timer takes a consistent snapshot of the database and photos, encrypts it with `age`, and keeps it in
+`/var/lib/capsnap-backup` for 30 days (photos live 30 days too, Spec §6). Copies 2 and 3 are W4b.
+
+- **The box holds only the public key.** Make the key pair on **your own computer**, never on the box:
+  `age-keygen -o capsnap-backup-key.txt` prints the public key (`age1…`). Put that one line in
+  `/etc/capsnap/backup.recipients` (`root:capsnap`, 0640), then re-run `install.sh` to enable the timer.
+  Store `capsnap-backup-key.txt` in two places off the box. **Lose it and every backup is unreadable.**
+- **Check it:** `capsnap-backup status` (exit 1 if the last good backup is older than 36 hours or the last run
+  failed). Run one now: `systemctl start capsnap-backup.service`; logs: `journalctl --namespace=capsnap`.
+- **If a backup fails,** `/var/lib/capsnap/BACKUP_FAILED` appears: the hourly retention job, `capsnapctl retention`
+  and `capsnap-release activate` all refuse until the next good run removes it (Spec §7). `rollback` still works.
+- **Restore** (on your computer or any Ubuntu box, with the private key and the `capsnap-server` binary):
+
+  ```bash
+  sha256sum -c snapshot-<time>.tar.age.sha256            # first, with both files in one directory
+  age -d -i capsnap-backup-key.txt snapshot-<time>.tar.age | tar -xf -
+  capsnap-server verify-backup snapshot-<time>
+  capsnap-server restore-backup snapshot-<time> /var/lib/capsnap-restored   # empty or new directory only
+  ```
+
+  It prints what came back (organizations, captures, photos). Photos retention had already removed stay gone.
+  Restoring onto the live box is a deliberate manual step: stop `capsnap`, move the old data aside, restore into
+  `/var/lib/capsnap`, fix ownership to `capsnap`, start `capsnap`.
+
 ## Rules that keep this safe
 
 - **Database migrations must be additive** (new tables, new nullable columns). An older binary
@@ -145,5 +171,5 @@ It needs these repository settings:
   that drops or renames something needs its own plan.
 - **Never change `CAPSNAP_PUBLIC_BASE_URL` casually.** Every guest QR already shown points there.
   `install.sh` refuses to change it.
-- **Backups:** the only copies today are on the same disk. Real backups are W4 (Spec Phase 4).
+- **Backups:** copy 1 is on the same disk (see "Backups"); copies 2 and 3 and the restore drill are W4b.
   Until then, test data only.
