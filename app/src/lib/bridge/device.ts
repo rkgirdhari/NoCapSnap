@@ -43,6 +43,7 @@ export const deviceBridge: Bridge = {
   },
   selftest: () => invoke<string>("run_selftest"),
   signIn: (serverUrl, login, password) => invoke<Session>("session_sign_in", { serverUrl, login, password }),
+  openPrivacyPolicy: () => invoke<void>("open_privacy_policy"),
   signOut: () => invoke<Profile>("session_sign_out"),
   refreshSession: () => invoke<Session>("session_refresh"),
   chooseLocation: (locationId) => invoke<Profile>("session_choose_location", { locationId }),

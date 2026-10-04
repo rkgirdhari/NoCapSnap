@@ -24,12 +24,11 @@ Updated 2026-10-04. Gate status lives in the table in [README.md](README.md); th
 - [ ] Make the Play upload key and add the four repository secrets (see the Android CI record)
 
 **Devices**
-- [ ] D9 step 5: back button and camera indicator (still "not reported")
+- [ ] D9 step 5: back button and camera indicator (still "not reported"); also tap Settings → "Read the privacy policy" once signed in
 - [ ] Run the Windows desktop installer for the first time
 
 ## Mine (Claude) — open
 
-- [ ] In-app link to the privacy policy. Needs the Tauri opener plugin, so it changes the app's capabilities and wants its own review
 - [ ] iOS: opens after W4; proposal waits on I1–I4 ([proposal](.hcc-nocapsnap/protocol/IOS-PROPOSAL-apple-app-store.md))
 - [ ] Incremental photo copies in the backup (proposed in W4, not built)
 
@@ -37,4 +36,5 @@ Updated 2026-10-04. Gate status lives in the table in [README.md](README.md); th
 
 - [x] Remote branches cleaned up; W3b checklist, W4 and W5 proposals merged (#31, #32, #34)
 - [x] W4a: encrypted backup, verify, restore, failure pause (#33)
+- [x] W5a: in-app "Read the privacy policy" link (Rust-side opener, no new WebView permission); needs a phone check
 - [x] W5a: `/privacy`, Data Safety draft and CI guard (#35); `capsnapctl remove-staff` (#36)
