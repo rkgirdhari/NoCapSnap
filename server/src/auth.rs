@@ -279,19 +279,23 @@ pub async fn sign_in(
     let created = Utc::now();
     let expires_at = rfc3339(plus(created, TimeDelta::days(state.cfg.session_days)));
     let session_id = new_id();
-    sqlx::query(
-        "INSERT INTO device_sessions (id, staff_id, token_hash, device_label, created_at, last_seen_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    let created_ok = create_session(
+        &state.pool,
+        &session_id,
+        &staff_id,
+        &token_hash(&token),
+        &label,
+        created,
+        &expires_at,
     )
-    .bind(&session_id)
-    .bind(&staff_id)
-    .bind(token_hash(&token))
-    .bind(&label)
-    .bind(rfc3339(created))
-    .bind(rfc3339(created))
-    .bind(&expires_at)
-    .execute(&state.pool)
     .await?;
+    if !created_ok {
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "bad_credentials",
+            "wrong sign-in name or password",
+        ));
+    }
     let staff = Staff {
         session_id,
         staff_id,
@@ -344,4 +348,34 @@ async fn me_for(state: &AppState, staff: &Staff) -> ApiResult<Me> {
         },
         locations: locations_for(state, staff).await?,
     })
+}
+
+/// Record a device session, but only while the account is still active, in one statement.
+/// A removal (`admin::remove_staff`) that commits while sign-in is checking the password
+/// must not be followed by a fresh session row. Returns false when nothing was inserted.
+pub async fn create_session(
+    pool: &sqlx::SqlitePool,
+    session_id: &str,
+    staff_id: &str,
+    token_hash: &str,
+    label: &str,
+    created: DateTime<Utc>,
+    expires_at: &str,
+) -> Result<bool, sqlx::Error> {
+    let inserted = sqlx::query(
+        "INSERT INTO device_sessions (id, staff_id, token_hash, device_label, created_at, last_seen_at, expires_at)
+         SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM staff WHERE id = ? AND active = 1)",
+    )
+    .bind(session_id)
+    .bind(staff_id)
+    .bind(token_hash)
+    .bind(label)
+    .bind(rfc3339(created))
+    .bind(rfc3339(created))
+    .bind(expires_at)
+    .bind(staff_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(inserted == 1)
 }

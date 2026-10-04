@@ -77,3 +77,86 @@ async fn removing_someone_who_does_not_exist_says_so() {
         .unwrap_err();
     assert!(err.contains("no staff member"), "{err}");
 }
+
+#[tokio::test]
+async fn removal_succeeds_when_the_obvious_replacement_logins_are_taken() {
+    let w = world().await;
+    let pool = &w.state.pool;
+    let (id,): (String,) = sqlx::query_as("SELECT id FROM staff WHERE login = 'chen@atelier'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    // Logins another admin could have chosen, including the old eight-character scheme.
+    for taken in [
+        format!("removed-{}", &id[..8]),
+        "removed-12345678".to_owned(),
+    ] {
+        capsnap_server::admin::create_staff(
+            pool,
+            "atelier",
+            &taken,
+            "Squatter",
+            "server",
+            PASSWORD,
+            &[],
+        )
+        .await
+        .unwrap();
+    }
+    capsnap_server::admin::remove_staff(pool, "chen@atelier")
+        .await
+        .unwrap();
+    // A second removal in the same state also succeeds, and the replacements are distinct.
+    capsnap_server::admin::remove_staff(pool, "ada@atelier")
+        .await
+        .unwrap();
+    let removed: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT login) FROM staff WHERE active = 0 AND display_name = 'Former staff'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert_eq!(removed, 2);
+}
+
+#[tokio::test]
+async fn a_session_cannot_be_created_for_an_account_removed_meanwhile() {
+    let w = world().await;
+    let pool = &w.state.pool;
+    let (id,): (String,) = sqlx::query_as("SELECT id FROM staff WHERE login = 'chen@atelier'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let now = chrono::Utc::now();
+    let later = "2099-01-01T00:00:00.000Z";
+
+    // While active, the insert works.
+    assert!(
+        capsnap_server::auth::create_session(pool, "s1", &id, &"a".repeat(64), "Pixel", now, later)
+            .await
+            .unwrap()
+    );
+    // Sign-in has verified the password; now the removal commits; then sign-in inserts.
+    capsnap_server::admin::remove_staff(pool, "chen@atelier")
+        .await
+        .unwrap();
+    assert!(
+        !capsnap_server::auth::create_session(
+            pool,
+            "s2",
+            &id,
+            &"b".repeat(64),
+            "Pixel",
+            now,
+            later
+        )
+        .await
+        .unwrap()
+    );
+    let left: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM device_sessions WHERE staff_id = ?")
+        .bind(&id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "no session data survives the removal");
+}

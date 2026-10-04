@@ -194,15 +194,25 @@ pub async fn remove_staff(pool: &SqlitePool, login: &str) -> Result<u64, String>
         .await
         .map_err(|e| e.to_string())??;
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
-    sqlx::query(
-        "UPDATE staff SET active = 0, login = ?, display_name = 'Former staff', password_hash = ? WHERE id = ?",
-    )
-    .bind(format!("removed-{}", &id[..8.min(id.len())]))
-    .bind(&hash)
-    .bind(&id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| e.to_string())?;
+    // A full random replacement login; if one is somehow taken (create_staff allows any
+    // login of the right shape), try another. A failed statement leaves the transaction usable.
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        let result = sqlx::query(
+            "UPDATE staff SET active = 0, login = ?, display_name = 'Former staff', password_hash = ? WHERE id = ?",
+        )
+        .bind(format!("removed-{}", new_id()))
+        .bind(&hash)
+        .bind(&id)
+        .execute(&mut *tx)
+        .await;
+        match result {
+            Ok(_) => break,
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() && attempts < 5 => continue,
+            Err(e) => return Err(e.to_string()),
+        }
+    }
     sqlx::query("DELETE FROM staff_locations WHERE staff_id = ?")
         .bind(&id)
         .execute(&mut *tx)
