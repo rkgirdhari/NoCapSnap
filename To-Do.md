@@ -9,7 +9,8 @@ Updated 2026-10-06. Gate status lives in the table in [README.md](README.md); th
 - [x] DNS: `nocapsnap.hammurabi.click` points at the VPS only
 - [x] `preflight.sh`, `install.sh`, `smoke.sh` (11/11); test restaurant and admin; phone sign-in, sync and QR
 - [ ] DNS: drop the VPS records for `hcc.software` / `www` (both still answer with Manus *and* the VPS)
-- [ ] Scan a guest QR with a second phone: guest page, rating, and the second scan refused (W3a steps 3–5)
+- [x] Guest QR scanned with a second phone: guest page, rating, second scan refused
+- [ ] Optional on the phone: airplane-mode capture that syncs later, and `capsnapctl revoke-sessions` signing the phone out (W3a steps 4–5)
 - [ ] Check the server's SSH host-key fingerprint once from the ZAP console, then add `VPS_KNOWN_HOSTS` for the deploy job
 
 **Backups (W4b)** — [proposal](.hcc-nocapsnap/protocol/W4-PROPOSAL-operations-hardening.md)

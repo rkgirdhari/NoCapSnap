@@ -326,3 +326,22 @@ own `adb reverse`. The real test of step 3 is W3b, with a domain and https.
 - **W2's part of the checklist: run on the owner's phone.** The results are in the W2 record ("D9 results").
 - **This record's additions** (sign-in, sync, QR, guest page, revoking a session): not run yet. They need a live
   server, so they move to W3b's live check on the VPS.
+
+## Device checklist on the live server (2026-10-06)
+
+Run by the owner against <https://nocapsnap.hammurabi.click> (W3b, "Live deploy"), with CapSnap 0.1.2 on their phone
+and a second phone as the guest. Evidence is the owner's screenshots.
+
+| Step | Result | Evidence |
+|---|---|---|
+| 1. Sign in | **Pass** | "Atelier No. 8 · Signed in as Hammurabi (admin). 4 dishes on the menu." The Demo tags are gone |
+| 2. Capture: the invitation turns into a QR | **Pass** | "Short rib · Atelier No. 8", "Synced · QR ready", "One use · expires November 5" |
+| 3. Scan with another phone, rate, scan again | **Pass** | The guest page shows the dish, the photo and the 1–5 rating. The address bar showed only the host. "Thank you." after sending; the second scan says "This link is no longer available." |
+| 4. Airplane mode, then capture: the plate waits, then syncs | **Not run** | |
+| 5. Revoke the session: the next sync signs out, plates stay | **Not run** | |
+
+- **Steps 1–3 are Built on a real phone and a real server.** The guest page loaded with no sign-in, and it asked for
+  no name, email or phone number.
+- **Steps 4–5 are still Specified.** They're covered by the sync client's end-to-end tests on a host; the owner can
+  run them on the phone at any time.
+

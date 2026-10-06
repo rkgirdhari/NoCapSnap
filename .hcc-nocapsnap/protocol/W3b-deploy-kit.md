@@ -186,7 +186,7 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
 | CapSnap live on the VPS; smoke test against the real domain | **Built** | Live at <https://nocapsnap.hammurabi.click> since 2026-10-06; smoke 11/11, re-checked from outside ("Live deploy" below) |
 | Phone sign-in against the live server | **Built** | The owner's phone, v0.1.2: "Signed in as Hammurabi (admin). 4 dishes on the menu." |
 | One real capture from a phone: sync and QR | **Built** | The owner's phone: "Short rib · Atelier No. 8", "Synced · QR ready", one use, expires in 30 days |
-| The guest page from a scanned QR; a second scan refused | **Specified** | The owner's next test (W3a checklist steps 3–5) |
+| The guest page from a scanned QR; a second scan refused | **Built** | A second phone: guest page, rating, "Thank you.", then "This link is no longer available." (W3a record) |
 | Backups of `/var/lib/capsnap` | **Specified** | W4 (Spec Phase 4). R1: test data only |
 
 ## Tenth Man
@@ -363,6 +363,9 @@ output, plus checks from outside over HTTPS.
   `https://nocapsnap.hammurabi.click`, and "0 synced, 0 waiting".
 - **First capture:** "Short rib" synced within seconds and showed "Synced · QR ready" with a one-use QR that expires
   in 30 days. The QR wasn't decoded here: opening it would use it up.
+- **The guest side:** a second phone scanned that QR, which opened the guest page for "Short rib · Atelier No. 8"
+  with the photo. A rating gave "Thank you.", and a second scan said "This link is no longer available."
+  (W3a record, "Device checklist on the live server").
 
 **Tenth Man (live).**
 - **Not rehearsed on 26.04.** CI rehearses the kit on Ubuntu 24.04. On the 26.04 box, install, smoke and
