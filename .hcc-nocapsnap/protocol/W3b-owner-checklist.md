@@ -1,5 +1,8 @@
 # W3b owner checklist: reinstall the VPS and deploy CapSnap
 
+**Status 2026-10-06:** steps 1–5 done, except dropping the VPS records for `hcc.software` / `www`. CapSnap is live at
+<https://nocapsnap.hammurabi.click>; what happened is in [W3b-deploy-kit.md](W3b-deploy-kit.md) ("Live deploy").
+
 Steps 1–5 of the order in [W3b-deploy-kit.md](W3b-deploy-kit.md) ("Owner decision (2026-10-03)"). Commands are in
 [`deploy/README.md`](../../deploy/README.md). Target: **Ubuntu 24.04 LTS**, domain `nocapsnap.hammurabi.click`.
 
