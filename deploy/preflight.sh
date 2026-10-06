@@ -82,7 +82,11 @@ else warn "certbot is not installed; install it (apt install certbot) or pass --
 # Ports
 if have ss; then
     listeners=$(ss -Hltn 2>/dev/null | awk '{ print $4 }')
-    if printf '%s\n' "$listeners" | grep -Eq "[:.]$PORT\$"; then bad "port $PORT is already in use; choose another with install.sh --port"
+    if printf '%s\n' "$listeners" | grep -Eq "[:.]$PORT\$"; then
+        # On a re-run the CapSnap server itself holds the port (seen on the VPS after its first install).
+        if ss -Hltnp "sport = :$PORT" 2>/dev/null | grep -q '"capsnap-server"'; then
+            info "port $PORT: the CapSnap server already listens there (a re-run keeps it)"
+        else bad "port $PORT is already in use; choose another with install.sh --port"; fi
     else ok "port $PORT is free for the server (loopback only)"; fi
     for p in 80 443; do
         if printf '%s\n' "$listeners" | grep -Eq "[:.]$p\$"; then ok "port $p: something is listening (nginx expected)"

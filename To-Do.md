@@ -1,15 +1,16 @@
 # To-Do
 
-Updated 2026-10-04. Gate status lives in the table in [README.md](README.md); this file is what is open and who holds it.
+Updated 2026-10-06. Gate status lives in the table in [README.md](README.md); this file is what is open and who holds it.
 
 ## Yours (the owner)
 
-**Deploy (W3b)** — [checklist](.hcc-nocapsnap/protocol/W3b-owner-checklist.md); most steps have a script: `scripts/owner-setup.ps1` (run `-Step Check` first)
-- [ ] Back up the IIS site(s) on the VPS, with their bindings
-- [ ] DNS: drop the VPS records for `hcc.software` / `www` (unless that site moves), drop the Manus record for `nocapsnap.hammurabi.click`
-- [ ] Reinstall Ubuntu 24.04 in the ZAP panel, outside the 7 October 05:00–11:00 window, with your public key
-  - 2026-10-04: `5.249.163.79` answers SSH but refuses the key (`Permission denied (publickey)`); either add the key or `ssh-add` the passphrase
-- [ ] Then "A freshly installed box", `preflight.sh`, `install.sh`, `smoke.sh`
+**Deploy (W3b)** — [checklist](.hcc-nocapsnap/protocol/W3b-owner-checklist.md). Live at <https://nocapsnap.hammurabi.click> since 2026-10-06 ([record](.hcc-nocapsnap/protocol/W3b-deploy-kit.md), "Live deploy")
+- [x] Back up the IIS site(s); reinstall (Ubuntu 24.04.5, since upgraded to 26.04.1); "A freshly installed box"
+- [x] DNS: `nocapsnap.hammurabi.click` points at the VPS only
+- [x] `preflight.sh`, `install.sh`, `smoke.sh` (11/11); test restaurant and admin; phone sign-in, sync and QR
+- [ ] DNS: drop the VPS records for `hcc.software` / `www` (both still answer with Manus *and* the VPS)
+- [ ] Scan a guest QR with a second phone: guest page, rating, and the second scan refused (W3a steps 3–5)
+- [ ] Check the server's SSH host-key fingerprint once from the ZAP console, then add `VPS_KNOWN_HOSTS` for the deploy job
 
 **Backups (W4b)** — [proposal](.hcc-nocapsnap/protocol/W4-PROPOSAL-operations-hardening.md)
 - [ ] B1 where copies 2 and 3 live · B2 backup window (30 days) · B3 how you learn a backup failed · B4 who holds the private key

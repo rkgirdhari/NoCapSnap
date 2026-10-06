@@ -181,9 +181,12 @@ refuses a certificate with under 14 days left. The fixture was fixed; the check 
 | Deploy kit: install, release switching, rollback, admin wrapper, smoke test, nginx blocks | **Built** | Local rehearsal above, and the CI `kit` job |
 | systemd sandbox (exposure 1.4) and 30-day journald namespace | **Built** on systemd 255 (CI runner) | On the VPS: **Specified** until preflight shows its systemd version |
 | Static musl binary | **Built** | CI `build` job |
-| Let's Encrypt via certbot webroot | **Specified** | Needs a public domain; no test can reach Let's Encrypt |
+| Let's Encrypt via certbot webroot | **Built** | On the VPS, 2026-10-06: certificate for `nocapsnap.hammurabi.click`, issuer Let's Encrypt YE2, valid to 2027-01-04 ("Live deploy" below) |
 | The deploy job (GitHub Actions to the VPS) | **Specified** | Needs the secrets, `VPS_KNOWN_HOSTS` and `CAPSNAP_DOMAIN`; never run |
-| CapSnap live on the VPS; smoke test against the real domain; one real capture from a phone | **Specified** | Waiting on G1, preflight and install by the owner |
+| CapSnap live on the VPS; smoke test against the real domain | **Built** | Live at <https://nocapsnap.hammurabi.click> since 2026-10-06; smoke 11/11, re-checked from outside ("Live deploy" below) |
+| Phone sign-in against the live server | **Built** | The owner's phone, v0.1.2: "Signed in as Hammurabi (admin). 4 dishes on the menu." |
+| One real capture from a phone: sync and QR | **Built** | The owner's phone: "Short rib · Atelier No. 8", "Synced · QR ready", one use, expires in 30 days |
+| The guest page from a scanned QR; a second scan refused | **Specified** | The owner's next test (W3a checklist steps 3–5) |
 | Backups of `/var/lib/capsnap` | **Specified** | W4 (Spec Phase 4). R1: test data only |
 
 ## Tenth Man
@@ -286,5 +289,84 @@ With two A records, each visitor lands on either one, so:
 
 | Item | Label |
 |---|---|
-| The VPS on Ubuntu 24.04, prepared as in "A freshly installed box" | **Specified**: the owner's steps, not started |
-| CapSnap live on the VPS | **Specified**, as above |
+| The VPS on Ubuntu 24.04, prepared as in "A freshly installed box" | **Built** (2026-10-04), then upgraded by the owner to 26.04.1 ("Live deploy" below) |
+| CapSnap live on the VPS | **Built** (2026-10-06), see "Live deploy" below |
+
+## Live deploy (2026-10-04 to 2026-10-06)
+
+The owner ran every step on the box; this workspace can't reach it over SSH. Evidence is the owner's terminal
+output, plus checks from outside over HTTPS.
+
+**The box (2026-10-04).**
+- **The reinstall:** ZAP's own Ubuntu 24.04.5 image, not the ISO installer. So the login is `root`, and there's a
+  locked `ubuntu` user with no keys.
+- **"A freshly installed box":**
+  - nginx 1.24 and certbot 2.9;
+  - `ufw` allowing 22, 80 and 443;
+  - unattended-upgrades;
+  - key-only SSH, which `sshd -T` on the box confirms: `passwordauthentication no`, `permitrootlogin without-password`.
+- **The host key:** the owner has the ED25519 fingerprint; it belongs in the deploy job's `VPS_KNOWN_HOSTS` secret,
+  not here. It has not been checked against the box's own console yet.
+
+**DNS.**
+- **A hidden Manus record:** after `nocapsnap` was unlinked from the Manus project, public DNS still answered with
+  Manus's address as well as the VPS for over an hour. The Manus page no longer listed it.
+- **The fix:** deleting the A record and adding it back cleared it. From 03:09 UTC on 10-04, Google and Cloudflare
+  answered with the VPS only.
+- **A false OK:** in the meantime, preflight said "points at this box" with both records present. Fixed in #28,
+  which also checks AAAA records.
+- **Still open:** `hcc.software` and `www.hcc.software` still answer with both Manus and the VPS (checked
+  2026-10-06). About half their visitors reach a box that no longer serves the site.
+
+**The first install, for the wrong name (2026-10-04, 03:07 UTC).**
+- **What happened:** `install.sh` was run for ZAP's own hostname for the box (`*.zap.cloud`) before the `nocapsnap`
+  DNS had cleared. It got a Let's Encrypt certificate for that name.
+- **The binary:** the CI build from `main` at `d3dd00a`. Its sha256 `b73a03dd…622a` matches that run's artifact,
+  which was re-downloaded here.
+- **The OS upgrade:** the owner then upgraded the box to Ubuntu 26.04.1 LTS, which brings:
+  - kernel 7.0;
+  - systemd 259, nginx 1.28.3 and certbot 4.0.0;
+  - the Rust coreutils and sudo-rs that Ubuntu ships since 25.10.
+
+  The server came back on boot and stayed healthy.
+
+**The re-run and the domain switch (2026-10-06).**
+- **Preflight found a kit bug:** it failed with "port 8090 is already in use", but the listener was CapSnap itself.
+  Fixed in this change, where CapSnap's own listener is now INFO.
+- **The switch:** no guest QR had been shown, so `CAPSNAP_PUBLIC_BASE_URL` was edited by hand to
+  `https://nocapsnap.hammurabi.click`. `install.sh` refuses to change it, by design. Then:
+  - the ZAP-name certificate was deleted;
+  - `install.sh --domain nocapsnap.hammurabi.click` was re-run with the running binary.
+- **Note on order:** deleting the certificate *before* the re-run left `capsnap.conf` pointing at missing files.
+  nginx kept serving from memory, but a restart in that gap would have failed. The re-run rewrote the block and
+  closed the gap.
+- **The certificate:** the first real run of the certbot webroot path. Let's Encrypt (YE2) issued it for
+  `nocapsnap.hammurabi.click`, valid to 2027-01-04.
+- **Smoke on the box: 11/11 PASS.** It was run on the box rather than from outside, so the "port 8090 from outside"
+  line is weaker there; `ufw` and the loopback bind cover it.
+- **Checked from outside, over HTTPS:**
+  - the certificate's name matches;
+  - `{"status":"ok"}`;
+  - the guest page's CSP starts from `default-src 'none'`;
+  - HSTS and `referrer-policy: no-referrer`;
+  - `http://` gives a 301 to https.
+- **The upgrade:** to the CI build of `main` at `e8fbeb2`, sha256 `858a84a9…252a`, which was checked before use.
+  `/privacy` answers 200 from outside.
+- **Getting the binary there:** downloading it to the box needs a GitHub artifact link that expires after about 10
+  minutes. Two expired before use. A lasting route, such as the deploy job or a release asset, would remove this
+  step.
+
+**Test data (R1).**
+- **Created:** organisation `atelier` ("Atelier No. 8"), one location in `America/Chicago`, one admin, and a 4-dish
+  test menu.
+- **On the phone (v0.1.2):** signed in, showing "Signed in as Hammurabi (admin). 4 dishes on the menu.", the server
+  `https://nocapsnap.hammurabi.click`, and "0 synced, 0 waiting".
+- **First capture:** "Short rib" synced within seconds and showed "Synced · QR ready" with a one-use QR that expires
+  in 30 days. The QR wasn't decoded here: opening it would use it up.
+
+**Tenth Man (live).**
+- **Not rehearsed on 26.04.** CI rehearses the kit on Ubuntu 24.04. On the 26.04 box, install, smoke and
+  `capsnapctl` worked, but rollback, prune and the backup timer haven't run there.
+- **SSH is `root` with a key.** The deploy job's least-privilege user is still open (Tenth Man above).
+- **No backups yet.** The W4a tooling is installed but off until the owner puts a public `age` key on the box, so R1
+  holds: test data only.
