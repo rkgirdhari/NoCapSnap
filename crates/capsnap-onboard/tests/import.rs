@@ -644,3 +644,132 @@ async fn courses_come_out_in_the_order_a_diner_reads_them() {
         "{order:?}"
     );
 }
+
+// Shapes seen on real restaurant sites (a stone-crab page that prints "$ 129.95", a steak house that lists
+// dishes separated by <br> and prints no prices).
+async fn one_page(body: &str) -> Server {
+    Server::start(vec![
+        (
+            "atelier8.test/robots.txt",
+            text(200, "User-agent: *\nDisallow:\n"),
+        ),
+        ("atelier8.test/", html(body)),
+    ])
+    .await
+}
+
+fn dishes(draft: &capsnap_onboard::Draft) -> Vec<(&str, &str, &str)> {
+    draft
+        .menu
+        .iter()
+        .map(|m| {
+            (
+                m.category.as_str(),
+                m.name.as_str(),
+                m.price.as_deref().unwrap_or(""),
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn prices_with_a_space_after_the_sign_and_dishes_split_by_line_breaks_are_read() {
+    let server = one_page(
+        r#"<html><head><title>Menu | Bistro Test</title></head><body>
+<h2>Stone Crabs</h2>
+<div>Jumbo</div><div>$ 129.95</div>
+<div>Large</div><div>$ 74.95</div>
+<p>Coffee<br>$4<br>Espresso<br>$3.50</p>
+</body></html>"#,
+    )
+    .await;
+    let site = server.url("atelier8.test", "/");
+
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+
+    assert_eq!(
+        dishes(&draft),
+        [
+            ("Stone Crabs", "Jumbo", "$129.95"),
+            ("Stone Crabs", "Large", "$74.95"),
+            // "Coffee" contains "fee": a whole-word check keeps it, a substring check would drop it.
+            ("Stone Crabs", "Coffee", "$4"),
+            ("Stone Crabs", "Espresso", "$3.50"),
+        ],
+        "{:#?}",
+        draft.menu
+    );
+}
+
+const UNPRICED: &str = r##"<html><head><title>Brooklyn Menu | Steak House</title></head><body>
+<div class="rte"><p>Served Daily Until 3:45 PM</p></div>
+<h2>Appetizers</h2>
+<p>Sliced tomatoes &amp; onions<br/>Caesar salad, grated pecorino and croutons<br/>Jumbo shrimp cocktail (4)<br/>Crab cake</p>
+<h2>Vegetables</h2>
+<p>French fried potatoes (for 1 or 2)<br/>Creamed spinach (for 2)<br/>Onion rings (for 2)</p>
+<h2>Party Facilities Available</h2>
+<p>Brooklyn - Accommodates up to 60</p>
+<p>No credit cards are accepted at either location.</p>
+<h2>Desserts</h2>
+<p>Apple strudel<br/>Cheese cake<br/>Pecan pie</p>
+<div>icon-X icon-chevron</div>
+<div>{"themeColor":"#000000","iconColor":"#ffffff"}</div>
+</body></html>"##;
+
+#[tokio::test]
+async fn a_menu_page_with_no_prices_is_read_by_its_headings() {
+    let server = one_page(UNPRICED).await;
+    let site = server.url("atelier8.test", "/");
+
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+
+    assert_eq!(
+        dishes(&draft),
+        [
+            ("Appetizers", "Sliced tomatoes & onions", ""),
+            (
+                "Appetizers",
+                "Caesar salad, grated pecorino and croutons",
+                ""
+            ),
+            ("Appetizers", "Jumbo shrimp cocktail (4)", ""),
+            ("Appetizers", "Crab cake", ""),
+            ("Vegetables", "French fried potatoes (for 1 or 2)", ""),
+            ("Vegetables", "Creamed spinach (for 2)", ""),
+            ("Vegetables", "Onion rings (for 2)", ""),
+            ("Desserts", "Apple strudel", ""),
+            ("Desserts", "Cheese cake", ""),
+            ("Desserts", "Pecan pie", ""),
+        ],
+        "the party-room section, the opening-times line, the icon label and the leaked settings are not dishes: {:#?}",
+        draft.menu
+    );
+    assert!(
+        draft.notes.iter().any(|n| n.contains("plain text")),
+        "{:?}",
+        draft.notes
+    );
+}
+
+#[tokio::test]
+async fn text_without_prices_is_not_taken_for_a_menu_unless_the_page_looks_like_one() {
+    // The same dishes on a page that is not about a menu.
+    let not_a_menu = UNPRICED.replace("Brooklyn Menu | Steak House", "Our story");
+    let server = one_page(&not_a_menu).await;
+    let site = server.url("atelier8.test", "/");
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+    assert!(draft.menu.is_empty(), "{:#?}", draft.menu);
+
+    // A menu-looking page with a single heading and a handful of lines is too thin to believe.
+    let thin = r#"<html><head><title>Menu</title></head><body>
+<h2>Appetizers</h2><p>Crab cake<br/>Onion rings<br/>Pecan pie<br/>Sorbet</p></body></html>"#;
+    let server = one_page(thin).await;
+    let site = server.url("atelier8.test", "/");
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+    assert!(draft.menu.is_empty(), "{:#?}", draft.menu);
+    assert!(
+        draft.notes.iter().any(|n| n.contains("No menu")),
+        "{:?}",
+        draft.notes
+    );
+}

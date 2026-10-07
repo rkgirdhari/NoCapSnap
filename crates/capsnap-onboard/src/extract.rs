@@ -139,6 +139,14 @@ pub fn extract(html: &str, page: &Url) -> Extracted {
             out.menu_from_text = true;
         }
     }
+    // Still nothing, on a page that says it is a menu: some menus print no prices.
+    if out.menu.is_empty() && looks_like_menu_page(&doc, page) {
+        let found = crate::plain::read_unpriced(&doc);
+        if !found.is_empty() {
+            out.menu = found;
+            out.menu_from_text = true;
+        }
+    }
 
     // ---- Fallbacks for the business itself ----
     if out.name.is_none() {
