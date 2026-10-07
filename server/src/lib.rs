@@ -61,7 +61,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/auth/sessions", post(auth::sign_in))
         .route("/api/v1/auth/sessions/current", delete(auth::sign_out))
         .route("/api/v1/me", get(auth::me))
-        .route("/api/v1/locations/{id}/menu-items", get(menu::list))
+        .route(
+            "/api/v1/locations/{id}/menu-items",
+            get(menu::list).put(menu::replace),
+        )
         // Streamed and size-checked inside the handler.
         .route(
             "/api/v1/media",

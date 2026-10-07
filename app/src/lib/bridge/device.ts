@@ -1,6 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AppInfo, Bridge, CaptureRecord, MenuItem, Profile, Session, StoreStatus, SyncReport } from "./types";
+import type {
+  AppInfo,
+  Bridge,
+  CaptureRecord,
+  ImportDraft,
+  MenuChoice,
+  MenuItem,
+  Profile,
+  Session,
+  StoreStatus,
+  SyncReport,
+} from "./types";
 
 // Android's WebView can't hand a request body to the app, so Tauri carries IPC
 // over postMessage as text there, and a Uint8Array would travel as a JSON list
@@ -26,6 +37,8 @@ export const deviceBridge: Bridge = {
   profile: () => invoke<Profile>("profile_get"),
   setDisplayName: (name) => invoke<Profile>("profile_set_name", { name }),
   menu: () => invoke<MenuItem[]>("menu_list"),
+  previewMenuImport: (siteUrl) => invoke<ImportDraft>("menu_import_preview", { siteUrl }),
+  saveMenuImport: (items: MenuChoice[]) => invoke<MenuItem[]>("menu_import_save", { items }),
   // The photo is the IPC body (raw bytes, or base64 on Android); the choices
   // ride along as percent-encoded headers, which both transports carry.
   ingest: async (photo, details) =>

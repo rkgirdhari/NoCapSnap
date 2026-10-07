@@ -265,6 +265,7 @@ dependencies = [
 name = "capsnap-sync"
 version = "0.0.0"
 dependencies = [
+ "capsnap-onboard",
  "capsnap-server",
  "capsnap-store",
  "chrono",

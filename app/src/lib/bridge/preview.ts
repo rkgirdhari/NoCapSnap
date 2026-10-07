@@ -1,4 +1,4 @@
-import type { Bridge, CaptureRecord, MenuItem, Profile, RemoteLocation } from "./types";
+import type { Bridge, CaptureRecord, ImportDraft, MenuItem, Profile, RemoteLocation } from "./types";
 
 // Browser preview for design review (built only in dev or with
 // VITE_CAPSNAP_PREVIEW=1). Mirrors the device contract in memory; nothing is
@@ -23,7 +23,7 @@ export function createPreviewBridge(): Bridge {
     ["demo-tuna-crudo", "Tuna crudo, yuzu kosho", "Starters"],
   ].map(([id, name, category]) => ({ id, name, category, source: "demo" }));
   const serverLocation: RemoteLocation = { id: "preview-atelier", name: "Atelier No. 8", timezone: "America/Chicago" };
-  const serverMenu: MenuItem[] = menu.map((m) => ({ ...m, id: m.id.replace("demo-", "srv-"), source: "server" }));
+  let serverMenu: MenuItem[] = menu.map((m) => ({ ...m, id: m.id.replace("demo-", "srv-"), source: "server" }));
 
   let displayName: string | null = null;
   const signedOut = (): Profile => ({
@@ -98,6 +98,29 @@ export function createPreviewBridge(): Bridge {
     async menu() {
       return currentMenu().map((m) => ({ ...m }));
     },
+    // Preview only: no website is read. Sample dishes show how the review step looks.
+    async previewMenuImport(siteUrl) {
+      if (!profile.signedIn) throw new Error("sign in again to sync");
+      if (profile.role !== "admin" && profile.role !== "manager") throw new Error("your role can't do that");
+      if (!/^https?:\/\/[^/\s]+/i.test(siteUrl.trim())) throw new Error("that isn't a web address");
+      const draft: ImportDraft = {
+        businessName: "Sample Bistro",
+        menu: [
+          { name: "Olive oil cake", category: "Desserts", description: null, price: "9 USD" },
+          { name: "Short rib", category: "Mains", description: null, price: "32 USD" },
+          { name: "Seared salmon", category: "Mains", description: null, price: "29 USD" },
+          { name: "Burrata", category: "Starters", description: null, price: "14 USD" },
+        ],
+        pagesRead: [siteUrl.trim()],
+        notes: ["Preview: these are sample dishes. No website was read."],
+      };
+      return draft;
+    },
+    async saveMenuImport(items) {
+      if (!items.length) throw new Error("send at least one dish; an empty menu would wipe the current one");
+      serverMenu = items.map((m, i) => ({ id: `srv-import-${i}`, name: m.name, category: m.category, source: "server" }));
+      return serverMenu.map((m) => ({ ...m }));
+    },
     async ingest(photo, details) {
       if (!sniff(photo)) throw new Error("only JPEG, PNG or WebP photos can be saved");
       const dish = details.menuItemId ? currentMenu().find((m) => m.id === details.menuItemId) : undefined;
@@ -147,17 +170,19 @@ export function createPreviewBridge(): Bridge {
     },
     async signIn(serverUrl, login, password) {
       if (!serverUrl.trim() || !login.trim() || !password) throw new Error("server address, sign-in name and password are required");
+      // Preview only: a sign-in name starting "ada" or "admin" is an admin, anything else is a server.
+      const manager = /^(ada|admin)/i.test(login.trim());
       profile = {
-        displayName: "Maya",
+        displayName: manager ? "Ada" : "Maya",
         locationId: serverLocation.id,
         locationName: serverLocation.name,
         isDemo: false,
         signedIn: true,
         serverUrl: serverUrl.trim(),
         organizationName: "Atelier No. 8",
-        role: "server",
+        role: manager ? "admin" : "server",
       };
-      displayName = "Maya";
+      displayName = manager ? "Ada" : "Maya";
       return { profile: { ...profile }, locations: [serverLocation] };
     },
     async openPrivacyPolicy() {
