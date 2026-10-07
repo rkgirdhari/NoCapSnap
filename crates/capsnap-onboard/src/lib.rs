@@ -7,9 +7,11 @@
 //! is never stored. There is no third-party search (Spec §2, §6): "search"
 //! means finding the menu pages inside the linked site.
 
+mod courses;
 mod extract;
 mod fetch;
 pub mod guard;
+mod plain;
 pub mod robots;
 
 use std::fmt;
@@ -196,6 +198,7 @@ pub async fn import(site_url: &str, consent: &Consent, cfg: &Config) -> Result<D
         ));
     }
     let mut pages_read = vec![home.url.to_string()];
+    let mut from_text = found.menu_from_text;
     let mut menu = found.menu;
 
     // Only go looking when the home page had no menu of its own.
@@ -212,6 +215,7 @@ pub async fn import(site_url: &str, consent: &Consent, cfg: &Config) -> Result<D
                 Ok(page) => {
                     let more = extract::extract(&page.body, &page.url);
                     pages_read.push(page.url.to_string());
+                    from_text |= more.menu_from_text && !more.menu.is_empty();
                     for item in more.menu {
                         if !menu.iter().any(|m: &DraftMenuItem| {
                             m.name == item.name && m.category == item.category
@@ -226,6 +230,14 @@ pub async fn import(site_url: &str, consent: &Consent, cfg: &Config) -> Result<D
     }
     if menu.is_empty() {
         notes.push("No menu in a form we can read was found; add dishes by hand.".into());
+    } else {
+        if from_text {
+            notes.push(
+                "These dishes were read from the page's plain text, not structured data: check each name and course."
+                    .into(),
+            );
+        }
+        courses::sort(&mut menu);
     }
 
     Ok(Draft {

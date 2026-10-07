@@ -66,16 +66,26 @@ async fn reads_business_and_menu_from_structured_data() {
         .collect();
     assert_eq!(
         menu,
+        // The site lists Mains first; the draft puts courses in the order a diner reads them.
         [
+            ("Starters", "Pork belly bao"),
             ("Mains", "Saffron butter cod"),
             ("Mains", "Wild mushroom risotto"),
-            ("Starters", "Pork belly bao")
         ]
     );
-    assert_eq!(draft.menu[0].price.as_deref(), Some("34 USD"));
+    let cod = draft
+        .menu
+        .iter()
+        .find(|m| m.name == "Saffron butter cod")
+        .unwrap();
+    assert_eq!(cod.price.as_deref(), Some("34 USD"));
     assert_eq!(
-        draft.menu[0].description.as_deref(),
+        cod.description.as_deref(),
         Some("Brown butter, saffron beurre blanc")
+    );
+    assert!(
+        !draft.notes.iter().any(|n| n.contains("plain text")),
+        "structured data needs no 'read from text' warning"
     );
 
     // Declared menu read; robots-disallowed page skipped with a note; no images fetched.
@@ -464,4 +474,173 @@ fn review_delivery_social_and_search_sites_are_refused() {
     ] {
         assert!(!is_denied_host(host), "{host}");
     }
+}
+
+// ---- Menus published as plain text (no structured data) ----
+
+const PLAIN_HOME: &str = r#"<html><head><title>Bistro Test</title></head><body>
+<h1>Bistro Test</h1><p>Neighbourhood cooking since 1998. Open Tue–Sat 5–10.</p>
+<p>Call 312-555-0108 for reservations. Gift cards from $50.</p>
+<a href="/menu">Dinner menu</a></body></html>"#;
+
+const PLAIN_MENU: &str = r#"<html><head><title>Dinner Menu | Bistro Test</title></head><body>
+<nav><a href="/">Home</a> <a href="/gift">Gift cards $50</a> <a href="/menu">Menu</a></nav>
+<h1>Our Menu</h1>
+<p>Gratuity of 18% is added for parties of 6 or more.</p>
+<h2>Desserts</h2>
+<p>Olive oil cake ........ 9</p>
+<p>Affogato   $8.50</p>
+<h2>Mains</h2>
+<ul>
+  <li><span>Short rib</span> <span>$32</span></li>
+  <li>Seared salmon — lemon, capers and brown butter $29</li>
+</ul>
+<table><tr><td>Mushroom risotto</td><td>$24</td></tr><tr><td>Corkage fee</td><td>$25</td></tr></table>
+<h2>STARTERS</h2>
+<div class="item"><div class="n">Burrata</div><div class="p">$14</div></div>
+<p>Peaches, basil and aged balsamic from the Hudson valley.</p>
+<div class="item"><div class="n">Charred carrots</div><div class="p">$11</div></div>
+<footer><p>Gift card $50 &middot; 8 W Kinzie St &middot; Est. 1998</p></footer>
+</body></html>"#;
+
+fn plain_site() -> Vec<(&'static str, Route)> {
+    vec![
+        (
+            "atelier8.test/robots.txt",
+            text(200, "User-agent: *\nDisallow:\n"),
+        ),
+        ("atelier8.test/", html(PLAIN_HOME)),
+        ("atelier8.test/menu", html(PLAIN_MENU)),
+    ]
+}
+
+#[tokio::test]
+async fn reads_a_plain_text_menu_sorts_the_courses_and_says_where_it_came_from() {
+    let server = Server::start(plain_site()).await;
+    let site = server.url("atelier8.test", "/");
+
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+
+    let menu: Vec<_> = draft
+        .menu
+        .iter()
+        .map(|m| {
+            (
+                m.category.as_str(),
+                m.name.as_str(),
+                m.price.as_deref().unwrap_or(""),
+            )
+        })
+        .collect();
+    assert_eq!(
+        menu,
+        [
+            // Starters first (the site lists them last), then mains, then desserts.
+            ("STARTERS", "Burrata", "$14"),
+            ("STARTERS", "Charred carrots", "$11"),
+            ("Mains", "Short rib", "$32"),
+            ("Mains", "Seared salmon", "$29"),
+            ("Mains", "Mushroom risotto", "$24"),
+            ("Desserts", "Olive oil cake", "9"),
+            ("Desserts", "Affogato", "$8.50"),
+        ],
+        "{:#?}",
+        draft.menu
+    );
+    // Not food: the gratuity notice, the corkage fee, the gift card in the nav and footer, the phone
+    // number and the opening hours.
+    let burrata = &draft.menu[0];
+    assert_eq!(
+        burrata.description.as_deref(),
+        Some("Peaches, basil and aged balsamic from the Hudson valley.")
+    );
+    assert_eq!(
+        draft
+            .menu
+            .iter()
+            .find(|m| m.name.starts_with("Seared salmon"))
+            .unwrap()
+            .description
+            .as_deref(),
+        Some("lemon, capers and brown butter"),
+        "a long line is split into the dish and its description"
+    );
+    assert!(
+        draft.notes.iter().any(|n| n.contains("plain text")),
+        "{:?}",
+        draft.notes
+    );
+    assert_eq!(draft.pages_read.len(), 2);
+}
+
+#[tokio::test]
+async fn a_page_with_just_a_few_prices_is_not_taken_for_a_menu() {
+    // The home page alone: a gift-card price and a phone number are not a menu.
+    let server = Server::start(vec![
+        (
+            "atelier8.test/robots.txt",
+            text(200, "User-agent: *\nDisallow:\n"),
+        ),
+        (
+            "atelier8.test/",
+            html(
+                PLAIN_HOME
+                    .replace("<a href=\"/menu\">Dinner menu</a>", "")
+                    .as_str(),
+            ),
+        ),
+    ])
+    .await;
+    let site = server.url("atelier8.test", "/");
+
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+
+    assert!(draft.menu.is_empty(), "{:#?}", draft.menu);
+    assert!(
+        draft.notes.iter().any(|n| n.contains("No menu")),
+        "{:?}",
+        draft.notes
+    );
+}
+
+#[tokio::test]
+async fn courses_come_out_in_the_order_a_diner_reads_them() {
+    let menu = r#"<html><head><script type="application/ld+json">{"@type":"Menu","hasMenuSection":[
+      {"@type":"MenuSection","name":"Cocktails & Wine","hasMenuItem":{"@type":"MenuItem","name":"Negroni"}},
+      {"@type":"MenuSection","name":"Desserts","hasMenuItem":{"@type":"MenuItem","name":"Tiramisu"}},
+      {"@type":"MenuSection","name":"Mains","hasMenuItem":{"@type":"MenuItem","name":"Ribeye"}},
+      {"@type":"MenuSection","name":"Wood-fired Pizzas","hasMenuItem":{"@type":"MenuItem","name":"Margherita"}},
+      {"@type":"MenuSection","name":"Sides","hasMenuItem":{"@type":"MenuItem","name":"Fries"}},
+      {"@type":"MenuSection","name":"Dessert Wines","hasMenuItem":{"@type":"MenuItem","name":"Moscato"}},
+      {"@type":"MenuSection","name":"Small Plates","hasMenuItem":{"@type":"MenuItem","name":"Olives"}},
+      {"@type":"MenuSection","name":"Soup & Salad","hasMenuItem":{"@type":"MenuItem","name":"Caesar"}},
+      {"@type":"MenuSection","name":"Steaks & Chops","hasMenuItem":{"@type":"MenuItem","name":"Tomahawk"}}]}</script>
+      </head></html>"#;
+    let server = Server::start(vec![
+        ("atelier8.test/robots.txt", text(404, "")),
+        ("atelier8.test/", html(menu)),
+    ])
+    .await;
+    let site = server.url("atelier8.test", "/");
+
+    let draft = import(&site, &consent(&site), &config()).await.unwrap();
+
+    let order: Vec<_> = draft.menu.iter().map(|m| m.name.as_str()).collect();
+    // Small plates; soup and salad; then the mains, the pizzas and the steaks in the order the site gave
+    // them ("Steaks" must not be mistaken for "tea"); sides; desserts; "Dessert Wines" with the drinks.
+    assert_eq!(
+        order,
+        [
+            "Olives",
+            "Caesar",
+            "Ribeye",
+            "Margherita",
+            "Tomahawk",
+            "Fries",
+            "Tiramisu",
+            "Negroni",
+            "Moscato"
+        ],
+        "{order:?}"
+    );
 }
