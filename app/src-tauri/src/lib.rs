@@ -232,6 +232,30 @@ async fn menu_list(state: State<'_, AppState>) -> CmdResult<Vec<MenuItemDto>> {
     Ok(items.into_iter().map(Into::into).collect())
 }
 
+/// Reads the restaurant's own website through the server and returns a draft menu to review.
+/// Nothing is saved. Only an admin or manager account may; the server says so in plain words.
+#[tauri::command]
+async fn menu_import_preview(
+    site_url: String,
+    state: State<'_, AppState>,
+) -> CmdResult<capsnap_sync::ImportDraft> {
+    capsnap_sync::import_preview(&state.store, &site_url)
+        .await
+        .map_err(text)
+}
+
+/// Saves the reviewed menu for this location and returns the phone's refreshed menu.
+#[tauri::command]
+async fn menu_import_save(
+    items: Vec<capsnap_sync::MenuChoice>,
+    state: State<'_, AppState>,
+) -> CmdResult<Vec<MenuItemDto>> {
+    capsnap_sync::save_menu(&state.store, items)
+        .await
+        .map_err(text)?;
+    menu_list(state).await
+}
+
 /// Headers carry the dish and table label next to the raw photo body,
 /// percent-encoded by the UI (`encodeURIComponent`).
 fn header(request: &Request<'_>, name: &str) -> CmdResult<Option<String>> {
@@ -503,6 +527,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_get,
         profile_set_name,
         menu_list,
+        menu_import_preview,
+        menu_import_save,
         session_sign_in,
         open_privacy_policy,
         session_sign_out,
@@ -526,6 +552,8 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_get,
         profile_set_name,
         menu_list,
+        menu_import_preview,
+        menu_import_save,
         session_sign_in,
         open_privacy_policy,
         session_sign_out,

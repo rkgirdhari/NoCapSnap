@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { bridge, type AppInfo, type MenuItem, type Profile, type RemoteLocation, type StoreStatus } from "$lib/bridge";
+  import MenuImport from "$lib/components/MenuImport.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
   import { cameraRoute, setCameraRoute, type CameraRoute } from "$lib/prefs";
 
@@ -230,6 +231,13 @@
     {/if}
     {#if sessionNote}<p class="note muted" role="status">{sessionNote}</p>{/if}
   </section>
+
+  {#if profile?.signedIn && (profile.role === "admin" || profile.role === "manager")}
+    <section>
+      <h2 class="kicker">Menu</h2>
+      <MenuImport currentCount={menu.length} onSaved={(m) => (menu = m)} />
+    </section>
+  {/if}
 
   <section>
     <h2 class="kicker">Camera</h2>

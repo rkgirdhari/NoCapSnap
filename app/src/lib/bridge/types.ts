@@ -48,6 +48,29 @@ export interface RemoteLocation {
   timezone: string;
 }
 
+/** A dish found on the restaurant's website. Price and description are for the reviewer only. */
+export interface ImportedDish {
+  name: string;
+  category: string;
+  description: string | null;
+  price: string | null;
+}
+
+/** The server's draft menu: nothing is saved until the owner confirms it. */
+export interface ImportDraft {
+  businessName: string | null;
+  menu: ImportedDish[];
+  pagesRead: string[];
+  /** Plain-language notes: what was skipped and why. */
+  notes: string[];
+}
+
+/** A dish as saved: a name and a course. */
+export interface MenuChoice {
+  name: string;
+  category: string;
+}
+
 export interface Session {
   profile: Profile;
   locations: RemoteLocation[];
@@ -90,6 +113,10 @@ export interface Bridge {
   profile(): Promise<Profile>;
   setDisplayName(name: string): Promise<Profile>;
   menu(): Promise<MenuItem[]>;
+  /** Reads the restaurant's own website through the server and drafts a menu. Admin or manager only. Saves nothing. */
+  previewMenuImport(siteUrl: string): Promise<ImportDraft>;
+  /** Saves the reviewed menu for this location and returns the phone's refreshed menu. */
+  saveMenuImport(items: MenuChoice[]): Promise<MenuItem[]>;
   /** Processes the photo on the device (2048 px, metadata stripped) and queues it. */
   ingest(photo: Uint8Array, details: CaptureDetails): Promise<CaptureRecord>;
   list(limit?: number): Promise<CaptureRecord[]>;

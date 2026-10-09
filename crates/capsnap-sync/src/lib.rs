@@ -194,6 +194,33 @@ impl Server {
         )
     }
 
+    /// Asks the server to read the restaurant's own website and draft a menu. Nothing is saved.
+    pub fn import_site(&self, token: &str, site_url: &str) -> Result<ImportDraft, SyncError> {
+        let body = serde_json::json!({ "siteUrl": site_url, "acceptedStatement": IMPORT_CONSENT });
+        Self::finish(
+            self.agent
+                .post(&self.url("/onboarding/import"))
+                .header("authorization", &format!("Bearer {token}"))
+                .send_json(body),
+        )
+    }
+
+    /// Saves the reviewed menu for a location, in order. The old menu is retired, not deleted.
+    pub fn replace_menu(
+        &self,
+        token: &str,
+        location_id: &str,
+        items: &[MenuChoice],
+    ) -> Result<Vec<RemoteMenuItem>, SyncError> {
+        let body = serde_json::json!({ "items": items });
+        Self::finish(
+            self.agent
+                .put(&self.url(&format!("/locations/{location_id}/menu-items")))
+                .header("authorization", &format!("Bearer {token}"))
+                .send_json(body),
+        )
+    }
+
     pub fn upload(&self, token: &str, jpeg: &[u8], sha256: &str) -> Result<String, SyncError> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -265,6 +292,42 @@ pub struct RemoteMenuItem {
     pub id: String,
     pub name: String,
     pub category: String,
+}
+
+/// A dish as saved: a name and a course.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuChoice {
+    pub name: String,
+    pub category: String,
+}
+
+/// What the restaurant must accept before the server reads its website (ONB-1). The server compares
+/// this word for word, and a test in `tests/menu_import.rs` keeps the two copies equal.
+pub const IMPORT_CONSENT: &str =
+    "I own or manage this website and allow NO CAP SNAP to read its public pages for this setup.";
+
+/// One dish found on the restaurant's website. Prices and descriptions are shown to the reviewer
+/// only: CapSnap keeps a name and a course.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedDish {
+    pub name: String,
+    pub category: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub price: Option<String>,
+}
+
+/// The server's draft menu, for the owner to check and edit before anything is saved.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDraft {
+    pub business_name: Option<String>,
+    pub menu: Vec<ImportedDish>,
+    pub pages_read: Vec<String>,
+    pub notes: Vec<String>,
 }
 
 /// Only what the server needs. The table label is device-only (owner default
@@ -425,6 +488,26 @@ async fn refresh_menu(store: &LocalStore) -> Result<(), SyncError> {
         .replace_menu(&location, MenuSource::Server, &rows)
         .await?;
     Ok(())
+}
+
+/// Reads the restaurant's website through the server and returns a draft menu. Only an admin or
+/// manager may; a server refusal (not your own site, robots.txt, no menu found) comes back as the
+/// server's own plain-language message.
+pub async fn import_preview(store: &LocalStore, site_url: &str) -> Result<ImportDraft, SyncError> {
+    let (server, token) = session(store).await?.ok_or(SyncError::SignedOut)?;
+    let url = site_url.trim().to_owned();
+    blocking(move || server.import_site(&token, &url)).await
+}
+
+/// Saves the reviewed menu for the current location, then refreshes this phone's copy of it.
+pub async fn save_menu(store: &LocalStore, items: Vec<MenuChoice>) -> Result<(), SyncError> {
+    let (server, token) = session(store).await?.ok_or(SyncError::SignedOut)?;
+    let location = store
+        .setting(Setting::LocationId)
+        .await?
+        .ok_or_else(|| SyncError::Local("no location is selected on this phone".into()))?;
+    blocking(move || server.replace_menu(&token, &location, &items).map(|_| ())).await?;
+    refresh_menu(store).await
 }
 
 /// Signs out on the server (best effort) and here. Captures stay on the phone;

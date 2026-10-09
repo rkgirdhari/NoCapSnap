@@ -22,6 +22,21 @@ tested on the host only.
 - **Extract.** schema.org JSON-LD `Restaurant`/`Menu` first, then microdata,
   then OpenGraph, `<title>`/`<h1>` and `tel:` links. Photos are never
   fetched. Raw HTML is dropped after parsing.
+- **Plain-text menus.** With no structured menu, the page text is read
+  (`plain.rs`): course headings, then one line per dish ending in a price
+  (`$32`, `32.00`, `€14,50`, `Short rib .... 32`, or the price on its own
+  line), a `<br>` ends a line. A page is believed only with 3 dishes if it
+  says "menu" in its address, title or main heading, otherwise 6. A menu page
+  that prints no prices is read by its headings, and only with at least 6
+  dishes under 2 headings. Charges, notices, party-room and contact sections
+  and leaked markup are skipped. The draft says these dishes came from text.
+- **Sorted.** The draft lists courses in the order a diner reads them
+  (breakfast, starters, soups and salads, mains, sides, desserts, drinks); the
+  site's own order is kept within a course and among courses we don't
+  recognise (`courses.rs`, English keywords).
+- **Not read.** Menus drawn by JavaScript (for example Dave & Buster's) or
+  held in images or PDFs are not in the HTML we fetch; the draft says no menu
+  was found and the owner adds dishes by hand.
 - **Draft only.** Nothing is saved until the requester reviews and confirms.
   There is no third-party name search (Spec §2, §6).
 

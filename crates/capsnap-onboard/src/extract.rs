@@ -41,6 +41,8 @@ pub struct Extracted {
     pub menu_links: Vec<Url>,
     /// Which source filled the business name, for the draft's notes.
     pub name_source: Option<&'static str>,
+    /// The dishes came from the page's plain text, not structured data: more likely to need fixing.
+    pub menu_from_text: bool,
 }
 
 fn sel(css: &str) -> Selector {
@@ -120,6 +122,32 @@ pub fn extract(html: &str, page: &Url) -> Extracted {
         }
     }
 
+    // ---- Plain text ----
+    // Many small restaurants publish no structured data. A page that looks like a menu needs 3 priced
+    // dishes to be believed; any other page needs 6.
+    if out.menu.is_empty() {
+        let found = crate::plain::read(
+            &doc,
+            if looks_like_menu_page(&doc, page) {
+                3
+            } else {
+                6
+            },
+        );
+        if !found.is_empty() {
+            out.menu = found;
+            out.menu_from_text = true;
+        }
+    }
+    // Still nothing, on a page that says it is a menu: some menus print no prices.
+    if out.menu.is_empty() && looks_like_menu_page(&doc, page) {
+        let found = crate::plain::read_unpriced(&doc);
+        if !found.is_empty() {
+            out.menu = found;
+            out.menu_from_text = true;
+        }
+    }
+
     // ---- Fallbacks for the business itself ----
     if out.name.is_none() {
         let meta = |prop: &str| {
@@ -173,6 +201,16 @@ pub fn extract(html: &str, page: &Url) -> Extracted {
         }
     }
     out
+}
+
+/// The address, title or main heading says "menu".
+fn looks_like_menu_page(doc: &Html, page: &Url) -> bool {
+    let named = |css: &str| {
+        doc.select(&sel(css))
+            .next()
+            .is_some_and(|e| text_of(e).to_lowercase().contains("menu"))
+    };
+    page.path().to_lowercase().contains("menu") || named("title") || named("h1")
 }
 
 fn text_of(el: ElementRef<'_>) -> String {

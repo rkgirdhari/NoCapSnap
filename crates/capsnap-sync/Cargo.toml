@@ -22,6 +22,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 
 [dev-dependencies]
 capsnap-server = { path = "../../server" }
+capsnap-onboard = { path = "../capsnap-onboard" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 tempfile = "3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
