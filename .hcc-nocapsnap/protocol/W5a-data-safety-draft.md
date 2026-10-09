@@ -32,6 +32,7 @@ form's wording changes, so re-read it when entering.
 | Personal info: **user IDs** (staff login) | Collected; not shared; required; app functionality, account management | `staff` table |
 | Password | Not a Data Safety category; stored only as an argon2id hash | `password.rs` |
 | Photos and videos: **photos** (dish photos) | Collected; not shared; required; app functionality | Spec §3; no people are the subject, but a photo could include one. Declare as photos |
+| Other: **restaurant website address** (typed by an admin to draft a menu) | Collected with the admin's confirmation that they own the site; not shared; optional; app functionality. The server, not the phone, reads the site | `onboarding_consents`, M1 |
 | Other user content: **guest comment** | Collected by the guest page, not by the app; list under the web page's policy | Spec §4 |
 | Location, contacts, calendar, messages, audio, health, financial, web history, files, device IDs, app activity | **Not collected** | Manifest has no such permission; no analytics |
 | Advertising ID, analytics, crash logs sent off-device | **None** | No third-party SDK; CSP blocks remote hosts |
@@ -64,6 +65,10 @@ sensitive data is not involved; Spec §6's "only CAMERA" is about sensitive perm
    registered but **no opener permission is granted**: the capability file stays `core:default`, so the WebView cannot
    open any address itself. The Play store listing link still waits on P1 and the live domain. **Built**; the address
    check is unit-tested, opening the browser is untested until the next device check.
+5. **Menu import was missing from the policy (found 2026-10-09, fixed in W5b).** v0.1.3 lets an admin send a website
+   address; the server fetches it and stores a consent record (address, statement, staff member, time). The policy did
+   not say so. It now has a section, and `server/tests/privacy.rs` checks it. **Owner decision (C1):** those consent
+   records have no retention job, so they are kept while the account exists. Keep that, or add a period?
 3. **The contact is not set.** Until P2 is answered, `/privacy` says so in plain words.
 4. **Server-side retention does not cover backups.** The policy says backups keep up to 30 days (W4a). That is only true
    once the backup timer is on; if backups are never switched on, that line is harmless but inaccurate.
