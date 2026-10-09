@@ -22,7 +22,9 @@ Updated 2026-10-06. Gate status lives in the table in [README.md](README.md); th
 **Play (W5)** — [proposal](.hcc-nocapsnap/protocol/W5-PROPOSAL-beta-play-readiness.md), [draft](.hcc-nocapsnap/protocol/W5a-data-safety-draft.md)
 - [ ] P1 register the Play developer account as the LLC; start D-U-N-S verification (the long pole)
 - [ ] P2 the privacy-policy contact (set `CAPSNAP_PRIVACY_CONTACT`) · P3 public or private distribution · P4 beta group and phones
-- [ ] Enter the Data Safety answers in Play Console, against the live form
+- [ ] Enter the Data Safety answers in Play Console, against the live form (new row: restaurant website address)
+- [ ] C1: keep menu-import consent records while the account exists, or give them a retention period? ([W5a draft](.hcc-nocapsnap/protocol/W5a-data-safety-draft.md), gap 5)
+- [ ] Review the store listing text and supply the screenshots ([W5b draft](.hcc-nocapsnap/protocol/W5b-store-listing-draft.md))
 - [ ] Make the Play upload key and add the four repository secrets (see the Android CI record)
 
 **Devices**
