@@ -69,6 +69,9 @@ switch_to() {
     new=$1
     old=$(target_of "$ROOT/current")
     point_current_at "$new"
+    # An operator-initiated restart must not be refused by the start-limit counter
+    # that a previous crash loop filled; the automatic Restart= loop still counts.
+    systemctl reset-failed capsnap 2>/dev/null || true
     systemctl restart capsnap
     if wait_healthy; then
         if [ -n "$old" ] && [ "$old" != "$new" ]; then
@@ -81,6 +84,9 @@ switch_to() {
     echo "capsnap-release: $(basename "$new") failed its health check" >&2
     if [ -n "$old" ] && [ "$old" != "$new" ] && [ -x "$old/capsnap-server" ]; then
         point_current_at "$old"
+        # An operator-initiated restart must not be refused by the start-limit counter
+        # that a previous crash loop filled; the automatic Restart= loop still counts.
+        systemctl reset-failed capsnap 2>/dev/null || true
         systemctl restart capsnap
         if wait_healthy; then
             echo "capsnap-release: switched back to $(basename "$old")" >&2

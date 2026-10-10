@@ -219,6 +219,9 @@ if [ -n "$release" ]; then
     capsnap-release activate "$release"
 else
     say "the binary is unchanged; restarting to pick up any unit or settings change"
+    # An operator-initiated restart must not be refused by the start-limit counter
+    # that a previous crash loop filled; the automatic Restart= loop still counts.
+    systemctl reset-failed capsnap 2>/dev/null || true
     systemctl restart capsnap
     capsnap-release status >/dev/null || die "the server is not healthy; see journalctl -u capsnap and journalctl --namespace=capsnap"
 fi
