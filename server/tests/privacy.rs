@@ -43,8 +43,9 @@ async fn the_policy_states_the_retention_periods_the_server_enforces() {
         "30 days after they arrive",
         "12 months",
         "Server logs: 30 days",
-        "up to 30 days",                    // backups (W4a)
+        "up to 30 days",                                          // backups (W4a)
         "Setting up a menu from a website", // ONB-1 / M1: the consent record has no retention job
+        "administrators and managers can read the guest answers", // feedback screen: who sees it
     ] {
         assert!(html.contains(needle), "missing: {needle}");
     }

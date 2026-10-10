@@ -65,6 +65,32 @@ export interface ImportDraft {
   notes: string[];
 }
 
+/** One guest answer. The server keeps nothing about the guest. */
+export interface FeedbackItem {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  dishName: string | null;
+}
+
+export interface FeedbackSummary {
+  count: number;
+  /** null when nobody has answered in the period. */
+  average: number | null;
+  /** How many guests gave 1, 2, 3, 4 and 5. */
+  distribution: [number, number, number, number, number];
+}
+
+export interface FeedbackPage {
+  days: number;
+  summary: FeedbackSummary;
+  /** Newest first. Never sorted or filtered by rating (Spec §4, neutrality). */
+  items: FeedbackItem[];
+  /** Pass back to `feedback` for the next, older page; null on the last one. */
+  nextBefore: string | null;
+}
+
 /** A dish as saved: a name and a course. */
 export interface MenuChoice {
   name: string;
@@ -115,6 +141,8 @@ export interface Bridge {
   menu(): Promise<MenuItem[]>;
   /** Reads the restaurant's own website through the server and drafts a menu. Admin or manager only. Saves nothing. */
   previewMenuImport(siteUrl: string): Promise<ImportDraft>;
+  /** What guests said about this location's dishes. Admin or manager only. */
+  feedback(days: number, before?: string | null): Promise<FeedbackPage>;
   /** Saves the reviewed menu for this location and returns the phone's refreshed menu. */
   saveMenuImport(items: MenuChoice[]): Promise<MenuItem[]>;
   /** Processes the photo on the device (2048 px, metadata stripped) and queues it. */

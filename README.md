@@ -29,7 +29,8 @@ internal quality control.
 3. **Guest page:**
    - the guest scans the code and rates the dish;
    - every guest sees the same neutral form, whatever their answer;
-   - the feedback is stored privately for the restaurant. *(A staff screen for reading it is not built yet.)*
+   - the feedback is stored privately for the restaurant, and administrators and managers read it in the app's
+     Insights tab (rating summary, then each answer, newest first; never ranked or filtered by rating).
 
 ## Principles
 

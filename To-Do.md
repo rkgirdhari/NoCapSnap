@@ -24,6 +24,7 @@ Updated 2026-10-06. Gate status lives in the table in [README.md](README.md); th
 - [ ] P2 the privacy-policy contact (set `CAPSNAP_PRIVACY_CONTACT`) · P3 public or private distribution · P4 beta group and phones
 - [ ] Enter the Data Safety answers in Play Console, against the live form (new row: restaurant website address)
 - [ ] C1: keep menu-import consent records while the account exists, or give them a retention period? ([W5a draft](.hcc-nocapsnap/protocol/W5a-data-safety-draft.md), gap 5)
+- [ ] F1: guest feedback is shown to administrators and managers only (the roles that manage a menu). Should chefs see it too? One line in `server/src/feedback.rs`
 - [ ] Review the store listing text and supply the screenshots ([W5b draft](.hcc-nocapsnap/protocol/W5b-store-listing-draft.md))
 - [ ] Make the Play upload key and add the four repository secrets (see the Android CI record)
 
@@ -37,6 +38,7 @@ Updated 2026-10-06. Gate status lives in the table in [README.md](README.md); th
 
 ## Done
 
+- [x] Staff feedback screen: `GET /locations/{id}/feedback` (admin and manager, own locations, paged) and the Insights tab (average, rating counts, answers, 7/30/90 days)
 - [x] Remote branches cleaned up; W3b checklist, W4 and W5 proposals merged (#31, #32, #34)
 - [x] W4a: encrypted backup, verify, restore, failure pause (#33)
 - [x] W4a: incremental photo copies: each photo encrypted once into a pool, daily archives refer to it by hash

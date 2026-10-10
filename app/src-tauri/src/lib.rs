@@ -244,6 +244,19 @@ async fn menu_import_preview(
         .map_err(text)
 }
 
+/// One page of what guests said about this location's dishes. Admin or manager accounts only;
+/// the server says so in plain words to anyone else.
+#[tauri::command]
+async fn feedback_list(
+    days: i64,
+    before: Option<String>,
+    state: State<'_, AppState>,
+) -> CmdResult<capsnap_sync::FeedbackPage> {
+    capsnap_sync::feedback_page(&state.store, days, before)
+        .await
+        .map_err(text)
+}
+
 /// Saves the reviewed menu for this location and returns the phone's refreshed menu.
 #[tauri::command]
 async fn menu_import_save(
@@ -528,6 +541,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_set_name,
         menu_list,
         menu_import_preview,
+        feedback_list,
         menu_import_save,
         session_sign_in,
         open_privacy_policy,
@@ -553,6 +567,7 @@ fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         profile_set_name,
         menu_list,
         menu_import_preview,
+        feedback_list,
         menu_import_save,
         session_sign_in,
         open_privacy_policy,

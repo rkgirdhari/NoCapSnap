@@ -4,6 +4,7 @@ import type {
   AppInfo,
   Bridge,
   CaptureRecord,
+  FeedbackPage,
   ImportDraft,
   MenuChoice,
   MenuItem,
@@ -38,6 +39,7 @@ export const deviceBridge: Bridge = {
   setDisplayName: (name) => invoke<Profile>("profile_set_name", { name }),
   menu: () => invoke<MenuItem[]>("menu_list"),
   previewMenuImport: (siteUrl) => invoke<ImportDraft>("menu_import_preview", { siteUrl }),
+  feedback: (days, before = null) => invoke<FeedbackPage>("feedback_list", { days, before }),
   saveMenuImport: (items: MenuChoice[]) => invoke<MenuItem[]>("menu_import_save", { items }),
   // The photo is the IPC body (raw bytes, or base64 on Android); the choices
   // ride along as percent-encoded headers, which both transports carry.

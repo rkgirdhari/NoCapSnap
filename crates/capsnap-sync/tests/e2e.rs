@@ -4,7 +4,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use capsnap_store::{CaptureDetails, DEMO_LOCATION_ID, LocalStore, Setting};
-use capsnap_sync::{Server, SyncError, check_server_url, sign_in, sync_pending};
+use capsnap_sync::{Server, SyncError, check_server_url, feedback_page, sign_in, sync_pending};
 
 const PASSWORD: &str = "correct horse battery";
 
@@ -57,6 +57,17 @@ async fn rig() -> Rig {
                 category: "Starters".into(),
             },
         ],
+    )
+    .await
+    .unwrap();
+    create_staff(
+        pool,
+        "atelier",
+        "ada@atelier",
+        "Ada",
+        "manager",
+        PASSWORD,
+        &[],
     )
     .await
     .unwrap();
@@ -442,4 +453,54 @@ async fn refuses_bad_credentials_and_non_https_servers() {
             "{bad}"
         );
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_manager_reads_feedback_on_the_phone_and_a_server_account_is_refused() {
+    let r = rig().await;
+    sign_in(&r.phone, &r.base, "maya@atelier", PASSWORD, "Pixel 9")
+        .await
+        .unwrap();
+    snap(&r, Some("Saffron butter cod"), None, 1).await;
+    sync_pending(&r.phone, &r.media).await.unwrap();
+
+    // A server account may not read feedback; the server's words come back.
+    match feedback_page(&r.phone, 30, None).await {
+        Err(SyncError::Refused { status: 403, .. }) => {}
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+
+    // A guest answers (straight into the server's table: the guest page has its own tests).
+    sqlx::query(
+        "INSERT INTO guest_feedback (id, link_id, rating, comment, created_at)
+         SELECT 'fb-1', id, 4, 'Lovely', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM guest_links",
+    )
+    .execute(&r.server.pool)
+    .await
+    .unwrap();
+
+    // The manager signs in on a second phone.
+    let dir = tempfile::tempdir().unwrap();
+    let boss = LocalStore::open(&dir.path().join("boss.db")).await.unwrap();
+    boss.seed_demo_if_empty().await.unwrap();
+    sign_in(&boss, &r.base, "ada@atelier", PASSWORD, "Pixel 9")
+        .await
+        .unwrap();
+    // Admins and managers are not tied to a location in the sign-in; the phone works at the first.
+    assert!(boss.setting(Setting::LocationId).await.unwrap().is_some());
+    let page = feedback_page(&boss, 30, None).await.unwrap();
+    assert_eq!(page.summary.count, 1);
+    assert_eq!(page.summary.average, Some(4.0));
+    assert_eq!(page.summary.distribution, [0, 0, 0, 1, 0]);
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].comment.as_deref(), Some("Lovely"));
+    assert_eq!(
+        page.items[0].dish_name.as_deref(),
+        Some("Saffron butter cod")
+    );
+    assert!(page.next_before.is_none());
+
+    // Only the server's own cursors are accepted.
+    let bad = feedback_page(&boss, 30, Some("x&days=1".into())).await;
+    assert!(matches!(bad, Err(SyncError::Local(_))), "{bad:?}");
 }

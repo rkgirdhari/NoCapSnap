@@ -9,6 +9,7 @@ pub mod captures;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod feedback;
 pub mod guest;
 pub mod media;
 pub mod menu;
@@ -65,6 +66,7 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/locations/{id}/menu-items",
             get(menu::list).put(menu::replace),
         )
+        .route("/api/v1/locations/{id}/feedback", get(feedback::list))
         // Streamed and size-checked inside the handler.
         .route(
             "/api/v1/media",
