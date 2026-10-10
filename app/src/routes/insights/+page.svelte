@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { bridge, type CaptureRecord } from "$lib/bridge";
-  import Icon from "$lib/components/Icon.svelte";
+  import GuestFeedback from "$lib/components/GuestFeedback.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
   import { isSameLocalDay } from "$lib/format";
 
-  // Only what this device knows: its own captures. Guest ratings need the
-  // server and guest feedback (later phases), so they are not faked here.
+  // The numbers above come from this device's own captures; guest answers come from the
+  // server, in their own section (GuestFeedback).
   let captures = $state<CaptureRecord[]>([]);
   let error = $state<string | null>(null);
 
@@ -63,13 +63,7 @@
     <p class="helper">Nothing captured in the last 7 days.</p>
   {/if}
 
-  <div class="card soon">
-    <Icon name="insights" size={28} stroke={1.4} />
-    <div>
-      <strong>Guest feedback</strong>
-      <p class="muted">Ratings and comments from guests appear here once guest invitations are live.</p>
-    </div>
-  </div>
+  <GuestFeedback />
 </main>
 
 <style>
@@ -124,20 +118,5 @@
     height: 6px;
     border-radius: 3px;
     background: var(--tab-active);
-  }
-  .soon {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 14px;
-    margin-top: 28px;
-    padding: 16px 18px;
-    color: var(--muted);
-  }
-  .soon strong {
-    color: var(--text);
-    font-weight: 600;
-  }
-  .soon p {
-    margin: 4px 0 0;
   }
 </style>

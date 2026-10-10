@@ -194,6 +194,33 @@ impl Server {
         )
     }
 
+    /// One page of what guests said about this location's dishes (admins and managers only).
+    pub fn feedback(
+        &self,
+        token: &str,
+        location_id: &str,
+        days: i64,
+        before: Option<&str>,
+    ) -> Result<FeedbackPage, SyncError> {
+        let mut path = format!("/locations/{location_id}/feedback?days={days}");
+        if let Some(b) = before {
+            // A cursor is the server's own `nextBefore`: time, `~`, id. Nothing else gets into the address.
+            if !b
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '.' | '-' | '~'))
+            {
+                return Err(SyncError::Local("not a feedback cursor".into()));
+            }
+            path.push_str(&format!("&before={b}"));
+        }
+        Self::finish(
+            self.agent
+                .get(&self.url(&path))
+                .header("authorization", &format!("Bearer {token}"))
+                .call(),
+        )
+    }
+
     /// Asks the server to read the restaurant's own website and draft a menu. Nothing is saved.
     pub fn import_site(&self, token: &str, site_url: &str) -> Result<ImportDraft, SyncError> {
         let body = serde_json::json!({ "siteUrl": site_url, "acceptedStatement": IMPORT_CONSENT });
@@ -328,6 +355,36 @@ pub struct ImportDraft {
     pub menu: Vec<ImportedDish>,
     pub pages_read: Vec<String>,
     pub notes: Vec<String>,
+}
+
+/// One guest answer. Nothing about the guest: the server keeps no identity (Spec §6).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedbackItem {
+    pub id: String,
+    pub rating: i64,
+    pub comment: Option<String>,
+    pub created_at: String,
+    pub dish_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedbackSummary {
+    pub count: i64,
+    pub average: Option<f64>,
+    /// How many guests gave 1, 2, 3, 4 and 5.
+    pub distribution: [i64; 5],
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedbackPage {
+    pub days: i64,
+    pub summary: FeedbackSummary,
+    pub items: Vec<FeedbackItem>,
+    /// Pass back as `before` for the next, older page; `None` on the last one.
+    pub next_before: Option<String>,
 }
 
 /// Only what the server needs. The table label is device-only (owner default
@@ -508,6 +565,21 @@ pub async fn save_menu(store: &LocalStore, items: Vec<MenuChoice>) -> Result<(),
         .ok_or_else(|| SyncError::Local("no location is selected on this phone".into()))?;
     blocking(move || server.replace_menu(&token, &location, &items).map(|_| ())).await?;
     refresh_menu(store).await
+}
+
+/// One page of guest feedback for the location this phone is working at. Only an admin or manager
+/// account may; the server's refusal comes back in its own plain words.
+pub async fn feedback_page(
+    store: &LocalStore,
+    days: i64,
+    before: Option<String>,
+) -> Result<FeedbackPage, SyncError> {
+    let (server, token) = session(store).await?.ok_or(SyncError::SignedOut)?;
+    let location = store
+        .setting(Setting::LocationId)
+        .await?
+        .ok_or_else(|| SyncError::Local("no location is selected on this phone".into()))?;
+    blocking(move || server.feedback(&token, &location, days, before.as_deref())).await
 }
 
 /// Signs out on the server (best effort) and here. Captures stay on the phone;

@@ -116,6 +116,31 @@ export function createPreviewBridge(): Bridge {
       };
       return draft;
     },
+    // Preview only: invented answers, to show how the screen reads. Nothing here came from a guest.
+    async feedback(days) {
+      if (!profile.signedIn) throw new Error("sign in again to sync");
+      if (profile.role !== "admin" && profile.role !== "manager") throw new Error("your role can't do that");
+      const sample: [number, string | null, string | null][] = [
+        [5, "Saffron butter cod", "Perfect. The sauce was glossy and the fish still just cooked."],
+        [4, "Pork belly bao", null],
+        [2, "Saffron butter cod", "Arrived lukewarm."],
+        [5, "Burrata", "Best thing we ate."],
+        [3, null, null],
+        [4, "Pork belly bao", "Great bun, a little salty."],
+      ];
+      const now = Date.now();
+      const items = sample.map(([rating, dishName, comment], i) => ({
+        id: `preview-${i}`,
+        rating,
+        comment,
+        dishName,
+        createdAt: new Date(now - (i * 7 + 1) * 3_600_000).toISOString(),
+      }));
+      const distribution: [number, number, number, number, number] = [0, 0, 0, 0, 0];
+      for (const it of items) distribution[it.rating - 1] += 1;
+      const average = Math.round((items.reduce((n, it) => n + it.rating, 0) / items.length) * 100) / 100;
+      return { days, summary: { count: items.length, average, distribution }, items, nextBefore: null };
+    },
     async saveMenuImport(items) {
       if (!items.length) throw new Error("send at least one dish; an empty menu would wipe the current one");
       serverMenu = items.map((m, i) => ({ id: `srv-import-${i}`, name: m.name, category: m.category, source: "server" }));

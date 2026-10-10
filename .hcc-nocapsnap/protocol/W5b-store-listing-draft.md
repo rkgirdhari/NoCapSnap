@@ -46,6 +46,8 @@ Built for a busy kitchen
 • Works without a connection. The photo is saved on the phone first and syncs when the signal returns.
 • Photos are resized on the phone, and their location and camera data are removed before they leave it.
 • Administrators and managers can draft a menu from the restaurant's own website, check it, and save it.
+• Administrators and managers read what guests said in the Insights tab: an average, how many gave each rating, and
+  every answer, newest first.
 • A lost phone can be signed out remotely.
 
 Private by design
@@ -62,9 +64,8 @@ Checked against the build: every sentence maps to something **Built** (capture a
 W3a; guest page: W3a; metadata stripping: W2; menu from a website: M1; session revocation: W3a;
 retention: `retention.rs`; no trackers: Data Safety draft). **Left out on purpose:**
 
-- *Reading the feedback in the app.* There is no staff screen for it yet (README). The text says the answer "goes to the
-  restaurant" and does not say where they read it. A reviewer or tester will ask. Either build that screen before a
-  public listing, or say plainly in the listing that feedback is read through the restaurant's administrator.
+- *Who may read feedback.* The Insights tab shows guest answers to administrators and managers only (decision F1).
+  The description says so; do not imply every staff member sees ratings.
 - *iOS, Windows and tablets.* The Windows installer exists but is not part of this listing.
 - *"Secure", "compliant", "GDPR".* Nothing here has been independently reviewed (Data Safety draft: no review).
 
